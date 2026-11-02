@@ -83,8 +83,7 @@ small{color:var(--dim)}
       <thead><tr>
         <th onclick="sortBy('class_no')">반</th><th onclick="sortBy('student_no')">학번</th>
         <th onclick="sortBy('name')">이름</th><th onclick="sortBy('score')">점수</th>
-        <th>① 구조</th><th>② 배선</th><th>③ 코드</th><th>④ 논리</th>
-        <th>⑤ 센서</th><th>⑥ 표시</th><th>⑦ 습도제어</th><th>⑧ 광주기</th>
+        <th>① 구조</th><th>② 코딩</th><th>③ 센서</th><th>④ 표시</th><th>⑤ 조건반응</th>
         <th onclick="sortBy('elapsed_sec')">소요</th><th>제출</th><th onclick="sortBy('created_at')">시각</th>
       </tr></thead>
       <tbody id="tb"></tbody>
@@ -95,7 +94,7 @@ small{color:var(--dim)}
 <script>
 const SB_URL = "https://xiyzesbtxrpkistruaii.supabase.co";
 const SB_KEY = "sb_publishable_c3OU2e6nmA5DNKhqfLbxvQ_GFZiw47u";
-const ORDER = ["structure","wiring","code","logic","sensor","display","humidity","photo"];
+const ORDER = ["structure","code","sensor","display","condition"];
 let KEY = "", ROWS = [], sortKey = "class_no", sortDir = 1;
 
 async function rpc(fn, args){
@@ -188,8 +187,13 @@ function detail(i){
       `${r.score} / 40 · ${Math.round((r.elapsed_sec||0)/60)}분 소요 · ${r.auto_submitted?"시간 종료로 자동 제출":"직접 제출"} · 제출 ${r.tries}회(최고점 표시)`}</small>
     ${r.score==null ? "" : `
     <h3>평가 항목</h3>
-    ${ORDER.map(k=>ru[k] ? `<div class="chk ${ru[k].ok?"ok":"no"}"><div class="ic">${ru[k].ok?"✔":"✘"}</div>
-       <div>${esc(ru[k].label)} <small>· ${esc(ru[k].crit||"")}</small></div></div>` : "").join("")}
+    ${ORDER.map((k,i)=>ru[k] ? `<div class="chk ${ru[k].ok?"ok":"no"}"><div class="ic">${ru[k].ok?"✔":"✘"}</div>
+       <div>${esc(ru[k].q || ru[k].label)}<br><small>${esc(ru[k].crit||"")} — ${esc(ru[k].label)}</small></div></div>` : "").join("")}
+    <h3>구조 확인 문항</h3>
+    <pre style="white-space:pre-wrap">${sl.quiz
+      ? `${sl.quiz.correct} / ${sl.quiz.total} 정답   ` +
+        (sl.quiz.detail||[]).map((q,i)=>`${i+1}번 ${q.ok?"O":"X"}(고른 답 ${q.picked==null?"없음":q.picked+1}번)`).join("  ")
+      : "(기록 없음)"}</pre>
     <h3>구조 서술</h3>
     <pre style="white-space:pre-wrap">${esc(sl.explanation) || "(비어 있음)"}</pre>
     <h3>배선</h3>
@@ -205,7 +209,7 @@ function detail(i){
 function csv(){
   const rows = filtered();
   const head = ["반","학번","이름","점수","소요(분)","제출방식","제출시각",
-    ...ORDER.map((k,i)=>`${i+1}.${k}`), "구조서술","배선","코드"];
+    ...ORDER.map((k,i)=>`${i+1}.${k}`), "문항정답수","구조서술","배선","코드"];
   const q = v => `"${String(v==null?"":v).replace(/"/g,'""')}"`;
   const body = rows.map(r=>{
     const ru = r.rubric||{}, sl = r.sim_log||{};
@@ -214,6 +218,7 @@ function csv(){
       r.score==null ? "" : (r.auto_submitted?"시간종료":"직접"),
       r.created_at || "",
       ...ORDER.map(k=> ru[k] ? (ru[k].ok?"O":"X") : ""),
+      sl.quiz ? `${sl.quiz.correct}/${sl.quiz.total}` : "",
       sl.explanation || "",
       (r.wiring||[]).map(w=>`${w.a}>${String(w.b).replace("mcu.","")}`).join(" "),
       r.code || ""].map(q).join(",");

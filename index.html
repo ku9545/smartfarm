@@ -123,6 +123,18 @@ svg#board{width:100%;height:auto;background:#0c141c;border:1px solid var(--line)
 #scoreBig{font-size:46px;font-weight:800;text-align:center;margin:6px 0}
 textarea.expl{width:100%;height:110px;background:#0b1218;color:var(--ink);border:1px solid var(--line);
   border-radius:9px;padding:11px;font-family:inherit;font-size:15px;line-height:1.5}
+.q{border-bottom:1px solid var(--line);padding:14px 0}
+.q:last-child{border-bottom:0;padding-bottom:0}
+.q .qt{font-weight:700;margin-bottom:9px;line-height:1.55}
+.q .qt i{color:var(--acc2);font-style:normal;margin-right:6px}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:9px 11px;margin:5px 0;border-radius:9px;
+  border:1px solid var(--line);background:var(--panel2);cursor:pointer;font-size:14.5px;line-height:1.5}
+.opt:hover{border-color:var(--acc2)}
+.opt.on{border-color:var(--acc2);background:#1b3348}
+.opt .mk{flex:none;width:21px;height:21px;border-radius:50%;border:2px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:11px;color:transparent;margin-top:1px}
+.opt.on .mk{border-color:var(--acc2);background:var(--acc2);color:#04203d}
+#qscore{font-size:14px;color:var(--dim);margin-top:12px}
 .overlay{position:fixed;inset:0;background:rgba(5,10,15,.85);z-index:100;display:flex;align-items:center;
   justify-content:center;padding:20px;overflow:auto}
 .overlay .card{max-width:520px}
@@ -177,6 +189,10 @@ textarea.expl{width:100%;height:110px;background:#0b1218;color:var(--ink);border
       스마트 팜을 만든다. 현재 <b>습도는 디스플레이에 표시</b>되어야 한다.</p>
       <p style="color:var(--dim);font-size:14px">제한 시간 35분. 위의 <b>⏱ 시작</b>을 누르면 타이머가 돌아간다.
       시간이 다 되거나 <b>완료·제출</b>을 누르면 자동으로 채점되어 저장된다.</p>
+      <p style="color:var(--dim);font-size:14px"><b>코드를 어디서 얻어 왔는지는 묻지 않는다.</b>
+      AI에게 받아 써도 되고 친구와 의논해도 된다. 다만 채점은 코드의 생김새가 아니라
+      <b>그 코드가 이 장치를 실제로 움직이는가</b>를 보므로, 받아 온 코드가 내가 꽂은 핀과 맞는지,
+      조건이 과제대로인지는 스스로 맞춰 넣어야 한다. ⑤ 점검표에 다섯 가지 물음이 그대로 적혀 있다.</p>
     </div>
 
     <div class="box">
@@ -193,6 +209,29 @@ textarea.expl{width:100%;height:110px;background:#0b1218;color:var(--ink);border
         <tr><td>아날로그 핀</td><td>A0 한 개 (0 ~ 1023)</td></tr>
         <tr><td>기본 I2C 핀</td><td>SDA = D2, SCL = D1</td></tr>
       </table>
+
+      <h3>1-1. 쓰는 부품</h3>
+      <table>
+        <tr><th>부품</th><th>모델 · 규격</th><th>동작 전압</th><th>보드 연결</th></tr>
+        <tr><td>마이크로컨트롤러</td><td>NodeMCU V3 (ESP8266 ESP-12E, CP2102 또는 CH340)</td><td>USB 5 V → 내부 3.3 V</td><td>—</td></tr>
+        <tr><td>온습도 센서</td><td>DHT22 (AM2302)</td><td>3.3 ~ 6 V</td><td>VCC → <code>3V3</code> 또는 <code>VIN</code>, DATA → 디지털 핀</td></tr>
+        <tr><td>디스플레이</td><td>1602 캐릭터 LCD + PCF8574 I2C 백팩 (주소 0x27)</td><td>5 V</td><td>VCC → <code>VIN</code>, SDA → <code>D2</code>, SCL → <code>D1</code></td></tr>
+        <tr><td>물뿜개</td><td>DC 3~6 V 미니 수중 펌프 + 1채널 릴레이 모듈 (SRD-05VDC-SL-C)</td><td>5 V</td><td>VCC → <code>VIN</code>, IN → 디지털 핀</td></tr>
+        <tr><td>생장등</td><td>식물 생장용 LED 모듈 (적색 660 nm + 청색 450 nm)</td><td>5 V</td><td>(+) → 디지털 핀, (−) → <code>GND</code></td></tr>
+      </table>
+
+      <h3>1-2. VCC는 어디에 꽂나</h3>
+      <p>부품에 적힌 <code>VCC</code>는 핀 이름이 아니라 <b>전원이 들어오는 자리</b>라는 뜻이다.
+      NodeMCU에는 전원 핀이 두 개 있고, 부품이 몇 볼트를 먹느냐에 따라 고른다.</p>
+      <ul>
+        <li><code>3V3</code> — 보드가 스스로 만들어 내는 3.3 V. DHT22처럼 적은 전류를 쓰는 센서에 알맞다.
+          보드의 레귤레이터가 감당하는 전류가 크지 않아, 여러 부품을 한꺼번에 물리면 보드가 재부팅된다.</li>
+        <li><code>VIN</code> — USB에서 들어온 5 V가 그대로 나오는 핀. 디스플레이·릴레이·LED처럼
+          5 V를 쓰는 부품은 여기에 꽂아야 제대로 돈다. 3V3에 꽂으면 LCD 글자가 흐리고 릴레이가 붙지 않는다.</li>
+      </ul>
+      <p>이 시뮬레이터는 <b><code>3V3</code>과 <code>VIN</code> 둘 다 전원으로 인정한다.</b>
+      실물에서 생기는 위의 차이만 머리에 담아 두면 된다. 다만 <b>GND는 반드시 연결해야 한다</b> —
+      전기는 돌아올 길이 있어야 흐르기 때문이다.</p>
 
       <h3>2. 드라이버 설치</h3>
       <p>보드의 USB-시리얼 칩에 맞는 드라이버를 PC에 설치한다. 칩이 <code>CP2102</code>면 실리콘랩스 드라이버,
@@ -351,9 +390,16 @@ textarea.expl{width:100%;height:110px;background:#0b1218;color:var(--ink);border
   <!-- ---------- 4. 점검표 ---------- -->
   <div class="page hidden" id="p4">
     <div class="box">
-      <h2>✍️ 구조 서술</h2>
-      <p style="color:var(--dim);font-size:14px">이 스마트 팜에서 <b>입력 · 처리 · 출력</b>이 각각 무엇이며
-      어떻게 이어지는지 두세 문장으로 적는다. (평가항목 1번)</p>
+      <h2>🧠 구조 확인 문항</h2>
+      <p style="color:var(--dim);font-size:14px">마이크로컨트롤러가 <b>세상을 무엇으로 인식하고, 세상에 어떻게 반응하는지</b>
+      묻는 네 문항이다. 세 문항 이상 맞히면 평가항목 1번이 인정된다. 몇 번이든 고쳐 고를 수 있다.</p>
+      <div id="quiz"></div>
+      <div id="qscore"></div>
+    </div>
+    <div class="box">
+      <h2>✍️ 구조 서술 <span style="font-size:13px;color:var(--dim);font-weight:400">· 점수에는 들어가지 않음</span></h2>
+      <p style="color:var(--dim);font-size:14px">위 문항을 고른 이유나, 이 장치의 입력·처리·출력이 어떻게 이어지는지
+      자기 말로 적어 둔다. 선생님이 읽고 기록에 쓴다.</p>
       <textarea class="expl" id="expl" placeholder="예) 입력은 … 센서이고, 처리는 … 이며, 출력은 … 이다. 이 셋이 이어져서 …"></textarea>
     </div>
     <div class="box">
@@ -361,8 +407,9 @@ textarea.expl{width:100%;height:110px;background:#0b1218;color:var(--ink);border
       <div id="scoreBig">—</div>
       <div id="checks"></div>
       <p style="color:var(--dim);font-size:13px;margin-top:12px">
-      40점 만점. 점검 항목 하나를 만족하지 못할 때마다 5점이 깎인다.
-      ⑤번 '습도 조건 반응'과 '광주기'는 실제로 시뮬레이션을 돌려서 그 장면이 관측되어야 인정된다.</p>
+      40점 만점. 다섯 물음 가운데 하나를 만족하지 못할 때마다 5점이 깎인다(최저 15점).
+      2·3·4·5번은 코드를 읽어서 매기지 않고, ④ 시뮬레이션을 돌렸을 때 그 일이 실제로 일어나는지로 매긴다.
+      한 번 돌려 본 뒤 고치고 다시 돌려도 된다.</p>
     </div>
   </div>
 </div>
@@ -418,7 +465,7 @@ function showAuth(t, err){ authMsg.textContent = t; authMsg.className = "msg " +
 function enterApp(){
   login.classList.add("hidden"); app.classList.remove("hidden");
   who.textContent = (ME.class_no?ME.class_no+"반 ":"") + ME.student_no + " " + ME.name;
-  restoreWork(); buildBoard(); buildStage(); renderWires(); renderChecks();
+  restoreWork(); buildBoard(); buildStage(); renderWires(); renderQuiz(); renderChecks();
 }
 
 /* ===================================================================
@@ -427,7 +474,7 @@ function enterApp(){
 function go(i){
   [...tabs.children].forEach((b,k)=>b.classList.toggle("on", k===i));
   [0,1,2,3,4].forEach(k=>document.getElementById("p"+k).classList.toggle("hidden", k!==i));
-  if(i===4) renderChecks();
+  if(i===4){ renderQuiz(); renderChecks(); }
   if(i===1) renderWires();
 }
 let tStart = null, tInt = null, finished = false;
@@ -460,13 +507,13 @@ const MCU_PINS = [
   {id:"D7",  x:520, y:336, side:"R"}, {id:"D8", x:520, y:373, side:"R"}
 ];
 const COMPS = [
-  {id:"dht",  name:"DHT22 온습도 센서", sub:"입력 · 공기의 온도와 습도", x:40, y:50, w:190, h:110,
-   pins:[{id:"VCC",dx:190,dy:30},{id:"DATA",dx:190,dy:58},{id:"GND",dx:190,dy:86}]},
-  {id:"lcd",  name:"I2C 디스플레이", sub:"출력 · 16×2 글자 표시", x:640, y:50, w:200, h:135,
+  {id:"dht",  name:"DHT22 (AM2302)", sub:"온습도 센서 · 3.3~6 V · 입력", x:40, y:50, w:200, h:110,
+   pins:[{id:"VCC",dx:200,dy:30},{id:"DATA",dx:200,dy:58},{id:"GND",dx:200,dy:86}]},
+  {id:"lcd",  name:"1602 I2C LCD", sub:"PCF8574 백팩 · 주소 0x27 · 5 V · 출력", x:630, y:50, w:210, h:135,
    pins:[{id:"VCC",dx:0,dy:30},{id:"GND",dx:0,dy:62},{id:"SDA",dx:0,dy:94},{id:"SCL",dx:0,dy:122}]},
-  {id:"pump", name:"물뿜개 펌프", sub:"출력 · 모터 드라이버 내장", x:40, y:440, w:190, h:110,
-   pins:[{id:"VCC",dx:190,dy:30},{id:"IN",dx:190,dy:58},{id:"GND",dx:190,dy:86}]},
-  {id:"led",  name:"생장등 LED", sub:"출력 · 빛", x:640, y:450, w:200, h:95,
+  {id:"pump", name:"미니 워터펌프 + 릴레이", sub:"DC 3~6 V 수중 펌프 · 1채널 릴레이 · 5 V · 출력", x:40, y:440, w:200, h:110,
+   pins:[{id:"VCC",dx:200,dy:30},{id:"IN",dx:200,dy:58},{id:"GND",dx:200,dy:86}]},
+  {id:"led",  name:"식물 생장 LED 모듈", sub:"적색 660 nm + 청색 450 nm · 5 V · 출력", x:630, y:450, w:210, h:95,
    pins:[{id:"+",dx:0,dy:32},{id:"-",dx:0,dy:66}]}
 ];
 let wires = [];     // {a:"dht.VCC", b:"mcu.D5"}
@@ -835,8 +882,14 @@ function normPin(v){
 }
 function applyPins(){
   const w = wiringStatus();
+  const pLed = SIM.ledOn, pPump = SIM.pumpOn;
   SIM.ledOn  = w.ledOK  && (SIM.pins[w.ledPin]  > 0);
   SIM.pumpOn = w.pumpOK && (SIM.pins[w.pumpPin] > 0);
+  const o = SIM.obs;
+  if(SIM.ledOn  !== pLed)  o.ledToggles  = (o.ledToggles  || 0) + 1;
+  if(SIM.pumpOn !== pPump) o.pumpToggles = (o.pumpToggles || 0) + 1;
+  // 출력 장치가 켜졌다 꺼지는 것을 두 번 이상 보이면 '코드가 기능을 작동시킨다'고 본다
+  if((o.ledToggles||0) + (o.pumpToggles||0) >= 2) o.actuatorWorks = true;
 }
 
 /* ---- 내장 함수 ---- */
@@ -1113,6 +1166,12 @@ function advance(ms){
 }
 function observe(hours){
   const o = SIM.obs;
+  // 디스플레이 내용이 실제로 갱신되는가 (고정 문구만 띄운 경우를 가려낸다)
+  if(o.lcdPrinted){
+    const buf = SIM.lcdBuf.join("|");
+    if(o.lcdSnap == null) o.lcdSnap = buf;
+    else if(buf !== o.lcdSnap) o.lcdUpdated = true;
+  }
   // 펌프 히스테리시스 관측
   if(SIM.pumpOn && !o._wasPump){ o.pumpStartHum = SIM.hum; o._wasPump = true;
     if(SIM.hum <= 43) o.pumpOnAtLow = true; }
@@ -1269,13 +1328,13 @@ let swt = null;
 function saveWorkDebounced(){ clearTimeout(swt); swt = setTimeout(saveWork, 600); }
 function saveWork(){
   try{
-    localStorage.setItem("sf_work", JSON.stringify({wires, code:editor.value, expl:expl.value}));
+    localStorage.setItem("sf_work", JSON.stringify({wires, code:editor.value, expl:expl.value, qa:QA}));
   }catch(e){}
 }
 function restoreWork(){
   try{
     const s = localStorage.getItem("sf_work");
-    if(s){ const d = JSON.parse(s); wires = d.wires||[]; editor.value = d.code||""; expl.value = d.expl||""; }
+    if(s){ const d = JSON.parse(s); wires = d.wires||[]; editor.value = d.code||""; expl.value = d.expl||""; QA = d.qa||[]; }
     const t = localStorage.getItem("sf_tstart");
     if(t){ tStart = +t; btnStart.textContent="⏱ 진행 중"; tick(); tInt = setInterval(tick,500); }
   }catch(e){}
@@ -1284,61 +1343,100 @@ function restoreWork(){
 expl.addEventListener("input", saveWorkDebounced);
 
 /* ===================================================================
+   7-2. 구조 확인 문항
+=================================================================== */
+const QUIZ = [
+  { q:"이 스마트 팜에서 마이크로컨트롤러가 <b>바깥 세상을 인식하는</b> 통로는 무엇인가?",
+    a:[ "USB 케이블로 들어오는 전원",
+        "DHT22가 공기의 온도·습도를 전기 신호로 바꾸어 보내 주는 값",
+        "디스플레이에 떠 있는 글자",
+        "코드에 미리 적어 둔 40과 70이라는 숫자" ], c:1 },
+  { q:"센서가 보낸 습도 값이 NodeMCU 안에서 <b>처리된다</b>는 것은 어떤 뜻인가?",
+    a:[ "값을 손대지 않고 그대로 디스플레이로 흘려보낸다",
+        "값이 센서에서 곧바로 펌프로 흘러가 펌프를 돌린다",
+        "읽은 값을 정해 둔 기준과 견주어 다음에 무엇을 할지 스스로 정한다",
+        "값을 인터넷 서버에 저장해 둔다" ], c:2 },
+  { q:"이 장치가 <b>세상에 반응하는</b> 방식(출력)끼리 묶인 것은?",
+    a:[ "습도 측정, 온도 측정",
+        "펌프로 물 뿌리기, 생장등 켜고 끄기, 디스플레이에 습도 띄우기",
+        "코드 업로드하기, 시리얼 모니터 열기",
+        "전원 넣기, 접지 연결하기" ], c:1 },
+  { q:"펌프가 물을 뿌리면 습도가 올라가고, 그 올라간 습도를 센서가 다시 읽는다. 이런 짜임을 무엇이라 하며 왜 필요한가?",
+    a:[ "되먹임(피드백) 고리 — 출력이 환경을 바꾸고 그 변화가 다시 입력이 되므로, 장치가 알아서 멈출 수 있다",
+        "직렬 통신 — 값을 한 줄로 차례차례 보내기 위해 필요하다",
+        "병렬 처리 — 여러 일을 한꺼번에 해내기 위해 필요하다",
+        "인터럽트 — 급한 일을 먼저 처리하기 위해 필요하다" ], c:0 }
+];
+let QA = [];   // 학생이 고른 번호
+function renderQuiz(){
+  quiz.innerHTML = QUIZ.map((item,i)=>`
+    <div class="q">
+      <div class="qt"><i>${i+1}.</i>${item.q}</div>
+      ${item.a.map((t,j)=>`
+        <div class="opt ${QA[i]===j?"on":""}" onclick="pickQ(${i},${j})">
+          <div class="mk">✓</div><div>${t}</div>
+        </div>`).join("")}
+    </div>`).join("");
+  const n = quizCorrect(), done = QA.filter(v=>v!==undefined && v!==null).length;
+  qscore.textContent = done < QUIZ.length
+    ? `${QUIZ.length}문항 중 ${done}문항 선택함`
+    : (n >= 3 ? `✔ ${n}/4 — 평가항목 1번 인정` : `${n}/4 — 세 문항 이상 맞혀야 인정된다. 다시 살펴볼 것`);
+  qscore.style.color = (done === QUIZ.length && n >= 3) ? "var(--acc)" : "var(--dim)";
+}
+function pickQ(i,j){ QA[i] = j; saveWork(); renderQuiz(); renderChecks(); }
+function quizCorrect(){ return QUIZ.reduce((s,item,i)=> s + (QA[i] === item.c ? 1 : 0), 0); }
+
+/* ===================================================================
    8. 채점
 =================================================================== */
 function grade(){
   const w = wiringStatus();
   const src = editor.value;
   const o = SIM.obs;
-  const txt = expl.value.trim();
-  const kw = (a)=>a.some(k=>txt.includes(k));
   const items = [
     { id:"structure", crit:"평가항목 1",
-      label:"피지컬 컴퓨팅의 구조(입력→처리→출력)를 설명함",
-      note:"⑤ 점검표의 서술 칸에 입력·처리·출력을 모두 담아 30자 이상 적기",
-      ok: txt.length >= 30 && kw(["입력","센서"]) && kw(["처리","제어","마이크로컨트롤러","NodeMCU","MCU"]) && kw(["출력","액츄에이터","액추에이터","표시","펌프","LED"]) },
-    { id:"wiring", crit:"평가항목 1",
-      label:"입력·처리·출력 장치가 모두 보드에 연결됨",
-      note:"센서 1개 + 출력 장치 3개(디스플레이·펌프·LED) 모두 올바른 배선",
-      ok: w.dhtOK && w.lcdOK && w.pumpOK && w.ledOK },
+      label:"물리 세상을 인식하고 반응하는 피지컬 컴퓨팅의 큰 구조를 설명할 수 있음",
+      q:"이 장치가 세상에서 무엇을 받아들이고, 세상에 어떻게 되돌려 주는지 말할 수 있는가?",
+      note:"⑤ 구조 확인 문항 네 개 가운데 세 개 이상 맞히기",
+      ok: quizCorrect() >= 3 },
     { id:"code", crit:"평가항목 2",
-      label:"코드로 프로세싱을 구현함 (setup/loop, 오류 없이 실행)",
-      note:"③ 코드 탭에 setup()과 loop()를 쓰고, ④에서 오류 없이 실행",
-      ok: !!o.compiled && !o.compileError && !o.runError && !!o.hasSetup && /void\s+loop/.test(src) },
-    { id:"logic", crit:"평가항목 2",
-      label:"조건 분기와 상태 기억을 사용함 (if + 변수)",
-      note:"if 문과, 펌프 켜짐을 기억하는 변수를 함께 사용",
-      ok: /\bif\s*\(/.test(src) && /\b(bool|boolean|int)\s+\w+/.test(src) && (o.iterations||SIM.iters) > 3 },
+      label:"피지컬 컴퓨팅에서 코딩을 통해 프로세싱 할 수 있음",
+      q:"코드가 센서 값을 읽어, 그 값에 따라 장치를 실제로 움직이는가?",
+      note:"오류 없이 실행되면서 ① 센서 값을 읽고 ② 그 결과로 펌프나 생장등이 켜졌다 꺼지는 것이 관측되어야 함. "
+          + "코드의 생김새나 문법은 보지 않고, 작동하는지만 본다",
+      ok: !!o.compiled && !o.compileError && !o.runError
+          && (!!o.readHum || !!o.readTemp) && !!o.actuatorWorks },
     { id:"sensor", crit:"평가항목 3",
-      label:"센서를 연결해 온도 또는 습도를 실제로 측정함",
-      note:"DHT 배선 + readHumidity() 또는 readTemperature() 호출이 실행됨",
+      label:"센서를 연결해 온도 혹은 습도를 측정함",
+      q:"DHT22가 보드에 제대로 물려 있고, 실제 측정값이 들어오는가?",
+      note:"VCC·GND·DATA 세 선이 모두 옳게 연결되고, readHumidity() 또는 readTemperature() 가 실행되어 값을 받아옴",
       ok: w.dhtOK && (!!o.readHum || !!o.readTemp) },
     { id:"display", crit:"평가항목 4",
-      label:"액츄에이터(디스플레이)로 결과를 출력함",
-      note:"LCD 배선 + lcd.print()로 숫자 값이 화면에 표시됨",
-      ok: w.lcdOK && !!o.lcdPrinted && !!o.lcdNumber },
-    { id:"humidity", crit:"평가항목 5",
-      label:"습도 조건에 따라 급수 장치가 반응함 (40% ↓ 작동, 70% ↑ 정지)",
-      note:"④에서 실제로 펌프가 40% 부근에서 켜지고 70% 부근에서 꺼지는 것이 관측되어야 함",
-      ok: !!o.humidityControl },
-    { id:"photo", crit:"평가항목 5",
-      label:"광주기 8시간 점등 / 16시간 소등을 구현함",
-      note:"④에서 LED가 약 8시간 켜졌다가 꺼지는 것이 관측되어야 함",
-      ok: !!o.photoperiod }
+      label:"액츄에이터를 통해 결과를 디스플레이 함",
+      q:"측정한 값이 디스플레이에 숫자로 뜨고, 값이 바뀌면 화면도 따라 바뀌는가?",
+      note:"디스플레이 배선(VCC·GND·SDA=D2·SCL=D1) + lcd.print() 로 숫자가 뜨고, 그 내용이 갱신되어야 함. "
+          + "고정된 문구만 띄우면 인정되지 않음",
+      ok: w.lcdOK && !!o.lcdPrinted && !!o.lcdNumber && !!o.lcdUpdated },
+    { id:"condition", crit:"평가항목 5",
+      label:"온습도의 특정 조건에 따라 반응하는 장치를 구현함",
+      q:"과제가 정한 조건(습도 40%↓ 급수 · 70%↑ 정지 · 하루 8시간 점등)대로 반응하는가?",
+      note:"④ 시뮬레이션에서 펌프가 40% 부근에서 켜지고 70% 부근에서 꺼지는 것, 그리고 생장등이 8시간 켜졌다 꺼지는 것이 모두 관측되어야 함",
+      ok: !!o.humidityControl && !!o.photoperiod }
   ];
   const miss = items.filter(i=>!i.ok).length;
-  const score = Math.max(0, 40 - miss*5);
+  const score = 40 - miss*5;          // 5개 항목 → 15 ~ 40점
   return {items, score};
 }
 function renderChecks(){
   const {items, score} = grade();
   scoreBig.textContent = score + " / 40";
   scoreBig.style.color = score >= 35 ? "var(--acc)" : score >= 25 ? "var(--warn)" : "var(--bad)";
-  checks.innerHTML = items.map(i=>`
+  checks.innerHTML = items.map((i,n)=>`
     <div class="chk ${i.ok?"ok":"no"}">
       <div class="ic">${i.ok?"✔":"✘"}</div>
-      <div><b>${i.label}</b> <span style="color:var(--dim);font-size:12px">· ${i.crit}</span>
-      <small>${i.note}</small></div>
+      <div><b>${n+1}. ${i.q}</b>
+      <small style="color:${i.ok?"var(--acc)":"var(--warn)"};margin-top:3px">${i.ok?"충족":"아직"} · ${i.note}</small>
+      <small>${i.crit} — ${i.label}</small></div>
     </div>`).join("");
 }
 
@@ -1351,9 +1449,11 @@ async function finish(auto){
   finished = true;
   stopRun(); clearInterval(tInt);
   const {items, score} = grade();
-  const rubric = {}; items.forEach(i=>rubric[i.id] = {ok:i.ok, label:i.label, crit:i.crit});
+  const rubric = {}; items.forEach(i=>rubric[i.id] = {ok:i.ok, label:i.label, crit:i.crit, q:i.q});
   const simlog = {hum:Math.round(SIM.hum*10)/10, temp:Math.round(SIM.temp*10)/10,
-    simHours:Math.round(SIM.t/3600000*10)/10, obs:SIM.obs, explanation: expl.value.trim(), loops:SIM.iters};
+    simHours:Math.round(SIM.t/3600000*10)/10, obs:SIM.obs, explanation: expl.value.trim(), loops:SIM.iters,
+    quiz:{answers:QA, correct:quizCorrect(), total:QUIZ.length,
+          detail:QUIZ.map((q,i)=>({picked:QA[i], right:q.c, ok:QA[i]===q.c}))}};
   const ov = document.createElement("div");
   ov.className = "overlay";
   ov.innerHTML = `<div class="card">
