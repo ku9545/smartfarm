@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>NodeMCU 스마트 팜 시뮬레이터</title>
+<style>
+:root{
+  --bg:#0f1720; --panel:#17222e; --panel2:#1d2a38; --line:#2c3d4f;
+  --ink:#e8eef4; --dim:#93a7b8; --acc:#4cc9a0; --acc2:#53a8ff;
+  --warn:#ffb545; --bad:#ff6b6b; --wire:#7fd4ff;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  font-size:16px;line-height:1.5}
+button{font-family:inherit;font-size:15px;cursor:pointer}
+.hidden{display:none !important}
+
+/* ---------- 로그인 ---------- */
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px;width:100%;max-width:420px}
+.card h1{margin:0 0 4px;font-size:22px}
+.card p.sub{margin:0 0 20px;color:var(--dim);font-size:14px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:13px;color:var(--dim);margin-bottom:4px}
+.field input,.field select{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);
+  background:var(--panel2);color:var(--ink);font-size:16px;font-family:inherit}
+.btn{width:100%;padding:12px;border-radius:10px;border:0;background:var(--acc);color:#06241b;font-weight:700;margin-top:8px}
+.btn.alt{background:var(--panel2);color:var(--ink);border:1px solid var(--line);font-weight:500}
+.msg{margin-top:12px;font-size:14px;min-height:20px}
+.msg.err{color:var(--bad)} .msg.ok{color:var(--acc)}
+.tabs2{display:flex;gap:8px;margin-bottom:18px}
+.tabs2 button{flex:1;padding:9px;border-radius:9px;border:1px solid var(--line);background:transparent;color:var(--dim)}
+.tabs2 button.on{background:var(--acc2);border-color:var(--acc2);color:#04203d;font-weight:700}
+
+/* ---------- 상단 바 ---------- */
+#top{position:sticky;top:0;z-index:50;background:var(--panel);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:12px;padding:8px 14px;flex-wrap:wrap}
+#who{font-size:14px;color:var(--dim)}
+#timer{font-variant-numeric:tabular-nums;font-size:22px;font-weight:700;padding:3px 12px;border-radius:9px;
+  background:var(--panel2);border:1px solid var(--line)}
+#timer.warn{color:var(--warn);border-color:var(--warn)}
+#timer.bad{color:var(--bad);border-color:var(--bad);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.5}}
+.spacer{flex:1}
+#top button{padding:8px 14px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--ink)}
+#btnSubmit{background:var(--acc);color:#06241b;border-color:var(--acc);font-weight:700}
+
+/* ---------- 탭 ---------- */
+#tabs{display:flex;gap:6px;padding:10px 14px 0;flex-wrap:wrap}
+#tabs button{padding:9px 16px;border-radius:10px 10px 0 0;border:1px solid var(--line);border-bottom:0;
+  background:transparent;color:var(--dim)}
+#tabs button.on{background:var(--panel);color:var(--ink);font-weight:700}
+.page{padding:14px;max-width:1400px;margin:0 auto}
+h2{font-size:19px;margin:0 0 10px}
+h3{font-size:16px;margin:18px 0 6px;color:var(--acc)}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.box.thin{padding:12px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left}
+th{background:var(--panel2);color:var(--dim);font-weight:600}
+code{background:#0b1218;padding:1px 5px;border-radius:4px;font-size:13px;color:#9ddcff}
+pre{background:#0b1218;padding:12px;border-radius:9px;overflow:auto;font-size:13px;line-height:1.45}
+ul,ol{padding-left:20px;margin:6px 0}
+li{margin:3px 0}
+.hintstep{border-left:3px solid var(--acc2);padding:8px 0 8px 12px;margin:10px 0;background:#15202b;border-radius:0 8px 8px 0}
+.hintstep b{color:var(--acc2)}
+details summary{cursor:pointer;color:var(--acc2);font-size:14px;padding:4px 0}
+
+/* ---------- 배선 ---------- */
+.wirewrap{display:grid;grid-template-columns:1fr 280px;gap:14px}
+@media(max-width:900px){.wirewrap{grid-template-columns:1fr}}
+svg#board{width:100%;height:auto;background:#0c141c;border:1px solid var(--line);border-radius:12px;touch-action:manipulation}
+.pin{cursor:pointer}
+.pin circle{transition:r .1s}
+.pin:hover circle{r:11}
+.pindot{fill:#3d556b;stroke:#6f8ba3;stroke-width:1.5}
+.pindot.pwr{fill:#a33}
+.pindot.gnd{fill:#444}
+.pindot.sel{fill:var(--warn);stroke:#fff;stroke-width:3}
+.pindot.used{fill:var(--acc)}
+.pinlbl{fill:#b9ccdd;font-size:11px;font-family:monospace}
+.comp{fill:#1c2b3a;stroke:#38506a;stroke-width:1.5;rx:10}
+.complbl{fill:#dce9f5;font-size:13px;font-weight:700}
+.compsub{fill:#7f97ad;font-size:10px}
+.wire{stroke:var(--wire);stroke-width:3.5;fill:none;opacity:.85;cursor:pointer}
+.wire:hover{stroke:var(--bad);stroke-width:5}
+#wirelist{font-size:13px}
+#wirelist div{display:flex;justify-content:space-between;align-items:center;padding:5px 7px;border-bottom:1px solid var(--line)}
+#wirelist button{background:transparent;border:0;color:var(--bad);font-size:16px}
+
+/* ---------- 코드 ---------- */
+#editor{width:100%;height:440px;background:#0b1218;color:#dbe9f5;border:1px solid var(--line);
+  border-radius:10px;padding:12px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.5;
+  white-space:pre;overflow:auto;tab-size:2}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.toolbar button{padding:8px 14px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--ink)}
+.toolbar button.go{background:var(--acc);color:#06241b;border-color:var(--acc);font-weight:700}
+.toolbar button.stop{background:var(--bad);color:#2b0505;border-color:var(--bad);font-weight:700}
+
+/* ---------- 시뮬레이션 ---------- */
+.simwrap{display:grid;grid-template-columns:1fr 340px;gap:14px}
+@media(max-width:1000px){.simwrap{grid-template-columns:1fr}}
+#stage{background:#0c141c;border:1px solid var(--line);border-radius:12px}
+.stat{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--line);font-size:14px}
+.stat b{font-variant-numeric:tabular-nums}
+.lcd{background:#0d8a5f;color:#dfffee;font-family:monospace;font-size:17px;padding:10px 12px;border-radius:8px;
+  letter-spacing:1px;border:4px solid #0a3b2a;min-height:70px;white-space:pre}
+.lcd.off{background:#15232d;color:#2c3d4f;border-color:#1b2a36}
+#serial{background:#0b1218;border:1px solid var(--line);border-radius:9px;height:170px;overflow:auto;
+  padding:9px;font-family:monospace;font-size:12px;white-space:pre-wrap}
+#serial .e{color:var(--bad)}
+.speeds{display:flex;gap:6px;margin:8px 0}
+.speeds button{flex:1;padding:7px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--dim);font-size:13px}
+.speeds button.on{background:var(--acc2);color:#04203d;border-color:var(--acc2);font-weight:700}
+
+/* ---------- 채점 ---------- */
+.chk{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px;align-items:flex-start}
+.chk .ic{width:22px;flex:none;font-size:17px;text-align:center}
+.chk.ok .ic{color:var(--acc)} .chk.no .ic{color:var(--bad)}
+.chk small{display:block;color:var(--dim);font-size:12px;margin-top:2px}
+#scoreBig{font-size:46px;font-weight:800;text-align:center;margin:6px 0}
+textarea.expl{width:100%;height:110px;background:#0b1218;color:var(--ink);border:1px solid var(--line);
+  border-radius:9px;padding:11px;font-family:inherit;font-size:15px;line-height:1.5}
+.overlay{position:fixed;inset:0;background:rgba(5,10,15,.85);z-index:100;display:flex;align-items:center;
+  justify-content:center;padding:20px;overflow:auto}
+.overlay .card{max-width:520px}
+</style>
+</head>
+<body>
+
+<!-- ================= 로그인 ================= -->
+<div id="login">
+  <div class="card">
+    <h1>🌱 NodeMCU 스마트 팜 시뮬레이터</h1>
+    <p class="sub">고1 과학탐구실험 · 피지컬 컴퓨팅 프로젝트</p>
+    <div class="tabs2">
+      <button id="tabLogin" class="on" onclick="setAuthMode('login')">로그인</button>
+      <button id="tabReg" onclick="setAuthMode('reg')">처음이에요</button>
+    </div>
+    <div class="field" id="fClass"><label>반</label>
+      <select id="inClass"><option value="1">1반</option><option value="2">2반</option><option value="3">3반</option>
+      <option value="4">4반</option><option value="5">5반</option><option value="6">6반</option>
+      <option value="7">7반</option><option value="8">8반</option></select></div>
+    <div class="field"><label>학번 (예: 10315)</label><input id="inNo" inputmode="numeric" autocomplete="off"></div>
+    <div class="field"><label>이름</label><input id="inName" autocomplete="off"></div>
+    <div class="field"><label>비밀번호 (4자 이상)</label><input id="inPw" type="password" autocomplete="off"></div>
+    <button class="btn" id="btnAuth" onclick="doAuth()">로그인</button>
+    <div class="msg" id="authMsg"></div>
+  </div>
+</div>
+
+<!-- ================= 본체 ================= -->
+<div id="app" class="hidden">
+  <div id="top">
+    <span id="who"></span>
+    <span id="timer">35:00</span>
+    <span class="spacer"></span>
+    <button onclick="startTimer()" id="btnStart">⏱ 시작</button>
+    <button id="btnSubmit" onclick="finish(false)">완료 · 제출</button>
+  </div>
+
+  <div id="tabs">
+    <button class="on" onclick="go(0)">① 과제·설명서</button>
+    <button onclick="go(1)">② 하드웨어 연결</button>
+    <button onclick="go(2)">③ 코드</button>
+    <button onclick="go(3)">④ 시뮬레이션</button>
+    <button onclick="go(4)">⑤ 점검표</button>
+  </div>
+
+  <!-- ---------- 0. 설명서 ---------- -->
+  <div class="page" id="p0">
+    <div class="box">
+      <h2>🎯 과제</h2>
+      <p><b>하루 8시간 빛 · 16시간 어둠</b>을 주고, <b>습도가 40% 이하로 떨어지면 70%가 될 때까지 물을 뿌리는</b>
+      스마트 팜을 만든다. 현재 <b>습도는 디스플레이에 표시</b>되어야 한다.</p>
+      <p style="color:var(--dim);font-size:14px">제한 시간 35분. 위의 <b>⏱ 시작</b>을 누르면 타이머가 돌아간다.
+      시간이 다 되거나 <b>완료·제출</b>을 누르면 자동으로 채점되어 저장된다.</p>
+    </div>
+
+    <div class="box">
+      <h2>📘 NodeMCU 초기 세팅 설명서</h2>
+      <p style="color:var(--dim);font-size:14px">실물로 할 때 거치는 과정이다. 시뮬레이터에서는 1~4단계가 이미 끝나 있다고 보고 5단계부터 시작한다.</p>
+
+      <h3>1. NodeMCU가 무엇인가</h3>
+      <p>ESP8266 칩을 얹은 마이크로컨트롤러 보드. 교과서의 '마이크로컨트롤러 보드'에 해당한다.
+      Wi-Fi가 내장되어 있고, USB 케이블 하나로 전원 공급과 코드 업로드를 함께 한다.</p>
+      <table>
+        <tr><th>항목</th><th>값</th></tr>
+        <tr><td>동작 전압</td><td>3.3 V (5 V 부품 직결 주의)</td></tr>
+        <tr><td>디지털 핀</td><td>D0 ~ D8</td></tr>
+        <tr><td>아날로그 핀</td><td>A0 한 개 (0 ~ 1023)</td></tr>
+        <tr><td>기본 I2C 핀</td><td>SDA = D2, SCL = D1</td></tr>
+      </table>
+
+      <h3>2. 드라이버 설치</h3>
+      <p>보드의 USB-시리얼 칩에 맞는 드라이버를 PC에 설치한다. 칩이 <code>CP2102</code>면 실리콘랩스 드라이버,
+      <code>CH340</code>이면 WCH 드라이버. 설치 후 장치 관리자(또는 시스템 정보)에서 COM 포트가 보이면 성공.</p>
+
+      <h3>3. Arduino IDE에 보드 추가</h3>
+      <ol>
+        <li>파일 → 환경설정 → '추가적인 보드 매니저 URLs'에 아래 주소를 넣는다.<br>
+          <code>https://arduino.esp8266.com/stable/package_esp8266com_index.json</code></li>
+        <li>툴 → 보드 → 보드 매니저 → <code>esp8266</code> 검색 → 설치</li>
+        <li>툴 → 보드 → <code>NodeMCU 1.0 (ESP-12E Module)</code> 선택</li>
+        <li>툴 → 포트 → 연결된 COM 포트 선택</li>
+      </ol>
+
+      <h3>4. 라이브러리 설치</h3>
+      <p>스케치 → 라이브러리 포함하기 → 라이브러리 관리에서 두 개를 설치한다.</p>
+      <ul>
+        <li><code>DHT sensor library</code> (Adafruit) — 온습도 센서용. 같이 뜨는 <code>Adafruit Unified Sensor</code>도 함께 설치</li>
+        <li><code>LiquidCrystal I2C</code> — I2C 디스플레이용</li>
+      </ul>
+
+      <h3>5. 배선 후 업로드</h3>
+      <ol>
+        <li>전원을 뺀 상태에서 부품을 연결한다. (전원이 들어온 채로 선을 꽂으면 부품이 상한다)</li>
+        <li>USB를 연결하고 → 버튼(업로드)을 누른다.</li>
+        <li>시리얼 모니터를 115200 bps로 열어 값이 찍히는지 확인한다.</li>
+      </ol>
+
+      <h3>⚠️ 자주 하는 실수</h3>
+      <ul>
+        <li><b>GND를 빠뜨림</b> — 전기는 돌아올 길이 있어야 흐른다. 모든 부품의 GND를 보드 GND에 연결한다.</li>
+        <li><b>D3, D4에 부품을 물리고 업로드 실패</b> — 이 두 핀은 부팅에 관여한다. 가능하면 D5~D7을 쓴다.</li>
+        <li><b>모터를 보드에 직결</b> — 전류가 커서 보드가 재부팅된다. 실물에서는 릴레이나 모터 드라이버를 거친다.
+        시뮬레이터에서는 펌프 모듈이 그 역할을 이미 포함하고 있다.</li>
+      </ul>
+    </div>
+
+    <div class="box">
+      <h2>🪜 단계별 힌트</h2>
+      <div class="hintstep"><b>1단계 · 구조 그리기</b><br>
+        피지컬 컴퓨팅은 <b>입력 → 처리 → 출력</b>의 되먹임 고리다.
+        무엇이 입력이고 무엇이 출력인지 먼저 적어 본다. (⑤ 점검표 탭의 서술 칸)</div>
+      <div class="hintstep"><b>2단계 · 전원과 접지</b><br>
+        모든 부품의 VCC를 <code>3V3</code>에, GND를 <code>GND</code>에 연결한다. LED의 (−)도 GND다.
+        이것부터 하면 나머지가 쉬워진다.</div>
+      <div class="hintstep"><b>3단계 · 신호선 연결</b><br>
+        DHT22의 DATA는 아무 디지털 핀이나(<code>D5</code> 권장).
+        디스플레이는 <b>SDA → D2, SCL → D1</b>로 정해져 있다.
+        펌프의 IN과 LED의 (+)도 각각 디지털 핀에 연결한다. 어느 핀에 꽂았는지 꼭 기억한다.</div>
+      <div class="hintstep"><b>4단계 · 뼈대 코드</b><br>
+        ③ 코드 탭의 <b>뼈대 불러오기</b>를 누르면 핀 번호와 setup()까지 들어 있는 틀이 나온다.
+        <code>TODO</code> 부분만 채우면 된다.</div>
+      <div class="hintstep"><b>5단계 · 센서 읽기</b><br>
+        <code>float h = dht.readHumidity();</code> 로 습도를 읽는다.
+        우선 <code>Serial.println(h)</code>로 값이 들어오는지부터 확인한다.</div>
+      <div class="hintstep"><b>6단계 · 디스플레이</b><br>
+        <code>lcd.setCursor(0,0); lcd.print("Humidity: "); lcd.print(h);</code><br>
+        숫자가 바뀔 때 잔상이 남으면 <code>lcd.clear()</code>를 먼저 부른다.</div>
+      <div class="hintstep"><b>7단계 · 급수 제어 (히스테리시스)</b><br>
+        <code>if (h &lt; 40) 물 켜기</code> 만 쓰면 40% 근처에서 계속 깜빡인다.
+        <b>켜는 기준과 끄는 기준을 다르게</b> 둔다.
+        켜짐 상태를 기억하는 변수 <code>bool pumpOn</code>을 하나 만들어,
+        <code>h &lt;= 40</code>이면 켜고, <code>h &gt;= 70</code>이면 끈다.</div>
+      <div class="hintstep"><b>8단계 · 광주기 8/16</b><br>
+        <code>millis()</code>는 켜진 뒤 지난 시간(ms)이다.
+        하루는 86400000 ms, 8시간은 28800000 ms.<br>
+        <code>unsigned long t = millis() % 86400000UL;</code> 로 '오늘 몇 시인지'를 구하고,
+        <code>t &lt; 28800000UL</code> 이면 LED를 켠다.</div>
+      <div class="hintstep"><b>9단계 · 돌려 보기</b><br>
+        ④ 시뮬레이션 탭에서 <b>▶ 실행</b>. 배속을 올려 하루가 지나가는 것을 확인한다.
+        습도가 40까지 떨어졌다가 70까지 차오르는 장면과, 빛이 8시간 뒤 꺼지는 장면을 모두 봐야 점수가 들어온다.</div>
+    </div>
+  </div>
+
+  <!-- ---------- 1. 배선 ---------- -->
+  <div class="page hidden" id="p1">
+    <div class="box thin">
+      <b>연결 방법</b> — 부품 쪽 단자를 누르고, 이어서 NodeMCU 쪽 핀을 누르면 선이 생긴다.
+      선을 누르면 지워진다. <button style="padding:5px 10px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--ink)" onclick="clearWires()">전부 지우기</button>
+    </div>
+    <div class="wirewrap">
+      <div><svg id="board" viewBox="0 0 900 620" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      <div>
+        <div class="box thin"><b style="font-size:14px">연결된 선</b><div id="wirelist"></div></div>
+        <div class="box thin" style="font-size:13px;color:var(--dim)">
+          <b style="color:var(--ink)">자가 점검</b>
+          <div id="wirecheck" style="margin-top:6px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- 2. 코드 ---------- -->
+  <div class="page hidden" id="p2">
+    <div class="toolbar">
+      <button onclick="loadSkeleton()">🧱 뼈대 불러오기</button>
+      <button onclick="go(3)">④ 시뮬레이션으로</button>
+      <button onclick="insertTab()">⇥ 들여쓰기</button>
+      <span class="spacer"></span>
+      <span style="font-size:13px;color:var(--dim);align-self:center" id="codeInfo"></span>
+    </div>
+    <textarea id="editor" spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
+    <details class="box thin" style="margin-top:12px">
+      <summary>이 시뮬레이터가 알아듣는 명령 목록</summary>
+      <div style="font-size:13.5px;line-height:1.8">
+      <code>pinMode(핀, OUTPUT/INPUT)</code> · <code>digitalWrite(핀, HIGH/LOW)</code> ·
+      <code>digitalRead(핀)</code> · <code>analogWrite(핀, 0~255)</code> ·
+      <code>delay(ms)</code> · <code>millis()</code> ·
+      <code>Serial.begin/print/println()</code> ·
+      <code>dht.begin()</code> · <code>dht.readHumidity()</code> · <code>dht.readTemperature()</code> ·
+      <code>lcd.init()/begin()</code> · <code>lcd.backlight()</code> · <code>lcd.clear()</code> ·
+      <code>lcd.setCursor(열,행)</code> · <code>lcd.print()</code> ·
+      <code>if / else / for / while</code> · <code>int, float, bool, long, unsigned long</code> ·
+      <code>D0~D8</code>, <code>HIGH/LOW</code>, <code>true/false</code>
+      </div>
+    </details>
+  </div>
+
+  <!-- ---------- 3. 시뮬레이션 ---------- -->
+  <div class="page hidden" id="p3">
+    <div class="toolbar">
+      <button class="go" id="btnRun" onclick="toggleRun()">▶ 실행</button>
+      <button onclick="resetSim()">↺ 처음부터</button>
+      <span class="spacer"></span>
+      <span style="font-size:13px;color:var(--dim);align-self:center">배속</span>
+    </div>
+    <div class="speeds">
+      <button onclick="setSpeed(60)" data-s="60">1초 = 1분</button>
+      <button onclick="setSpeed(600)" data-s="600" class="on">1초 = 10분</button>
+      <button onclick="setSpeed(3600)" data-s="3600">1초 = 1시간</button>
+      <button onclick="setSpeed(10800)" data-s="10800">1초 = 3시간</button>
+    </div>
+    <div class="simwrap">
+      <div><svg id="stage" viewBox="0 0 620 440" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      <div>
+        <div class="box thin" style="padding:0">
+          <div class="stat"><span>경과 시간</span><b id="sClock">0일 00:00</b></div>
+          <div class="stat"><span>습도</span><b id="sHum">—</b></div>
+          <div class="stat"><span>온도</span><b id="sTemp">—</b></div>
+          <div class="stat"><span>생장등(LED)</span><b id="sLed">—</b></div>
+          <div class="stat"><span>물뿜개 펌프</span><b id="sPump">—</b></div>
+          <div class="stat" style="border:0"><span>식물 상태</span><b id="sPlant">—</b></div>
+        </div>
+        <div class="box thin">
+          <div style="font-size:13px;color:var(--dim);margin-bottom:6px">I2C 디스플레이 (16×2)</div>
+          <div class="lcd off" id="lcd"> </div>
+        </div>
+        <div class="box thin">
+          <div style="font-size:13px;color:var(--dim);margin-bottom:6px">시리얼 모니터</div>
+          <div id="serial"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- 4. 점검표 ---------- -->
+  <div class="page hidden" id="p4">
+    <div class="box">
+      <h2>✍️ 구조 서술</h2>
+      <p style="color:var(--dim);font-size:14px">이 스마트 팜에서 <b>입력 · 처리 · 출력</b>이 각각 무엇이며
+      어떻게 이어지는지 두세 문장으로 적는다. (평가항목 1번)</p>
+      <textarea class="expl" id="expl" placeholder="예) 입력은 … 센서이고, 처리는 … 이며, 출력은 … 이다. 이 셋이 이어져서 …"></textarea>
+    </div>
+    <div class="box">
+      <h2>📋 현재 점검 상태 <button style="float:right;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--ink)" onclick="renderChecks()">새로 고침</button></h2>
+      <div id="scoreBig">—</div>
+      <div id="checks"></div>
+      <p style="color:var(--dim);font-size:13px;margin-top:12px">
+      40점 만점. 점검 항목 하나를 만족하지 못할 때마다 5점이 깎인다.
+      ⑤번 '습도 조건 반응'과 '광주기'는 실제로 시뮬레이션을 돌려서 그 장면이 관측되어야 인정된다.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===================================================================
+   0. 설정 / 서버
+=================================================================== */
+const SB_URL = "https://xiyzesbtxrpkistruaii.supabase.co";
+const SB_KEY = "sb_publishable_c3OU2e6nmA5DNKhqfLbxvQ_GFZiw47u";
+const LIMIT_SEC = 35 * 60;
+
+async function rpc(fn, args){
+  try{
+    const r = await fetch(SB_URL + "/rest/v1/rpc/" + fn, {
+      method:"POST",
+      headers:{ "apikey":SB_KEY, "Authorization":"Bearer "+SB_KEY, "Content-Type":"application/json" },
+      body: JSON.stringify(args)
+    });
+    if(!r.ok) return {ok:false, error:"서버 오류 ("+r.status+")"};
+    return await r.json();
+  }catch(e){ return {ok:false, error:"네트워크에 연결할 수 없습니다."}; }
+}
+
+let ME = null;
+
+/* ===================================================================
+   1. 로그인
+=================================================================== */
+let authMode = "login";
+function setAuthMode(m){
+  authMode = m;
+  tabLogin.classList.toggle("on", m==="login");
+  tabReg.classList.toggle("on", m==="reg");
+  fClass.style.display = m==="reg" ? "" : "none";
+  btnAuth.textContent = m==="reg" ? "가입하고 시작" : "로그인";
+  authMsg.textContent = "";
+}
+async function doAuth(){
+  const no = inNo.value.trim(), nm = inName.value.trim(), pw = inPw.value;
+  if(!no || !nm || !pw){ return showAuth("학번·이름·비밀번호를 모두 입력하세요.", true); }
+  btnAuth.disabled = true; showAuth("확인 중…", false);
+  let res;
+  if(authMode === "reg") res = await rpc("sf_register", {p_class:+inClass.value, p_student_no:no, p_name:nm, p_pw:pw});
+  else res = await rpc("sf_login", {p_student_no:no, p_name:nm, p_pw:pw});
+  btnAuth.disabled = false;
+  if(!res.ok) return showAuth(res.error || "실패", true);
+  ME = res;
+  try{ localStorage.setItem("sf_me", JSON.stringify(ME)); }catch(e){}
+  enterApp();
+}
+function showAuth(t, err){ authMsg.textContent = t; authMsg.className = "msg " + (err?"err":"ok"); }
+function enterApp(){
+  login.classList.add("hidden"); app.classList.remove("hidden");
+  who.textContent = (ME.class_no?ME.class_no+"반 ":"") + ME.student_no + " " + ME.name;
+  restoreWork(); buildBoard(); buildStage(); renderWires(); renderChecks();
+}
+
+/* ===================================================================
+   2. 탭 / 타이머
+=================================================================== */
+function go(i){
+  [...tabs.children].forEach((b,k)=>b.classList.toggle("on", k===i));
+  [0,1,2,3,4].forEach(k=>document.getElementById("p"+k).classList.toggle("hidden", k!==i));
+  if(i===4) renderChecks();
+  if(i===1) renderWires();
+}
+let tStart = null, tInt = null, finished = false;
+function startTimer(){
+  if(tStart) return;
+  tStart = Date.now();
+  try{ localStorage.setItem("sf_tstart", tStart); }catch(e){}
+  btnStart.textContent = "⏱ 진행 중";
+  tick(); tInt = setInterval(tick, 500);
+}
+function tick(){
+  const left = LIMIT_SEC - Math.floor((Date.now()-tStart)/1000);
+  if(left <= 0){ timer.textContent = "00:00"; clearInterval(tInt); if(!finished) finish(true); return; }
+  timer.textContent = String(Math.floor(left/60)).padStart(2,"0") + ":" + String(left%60).padStart(2,"0");
+  timer.className = left < 60 ? "bad" : (left < 300 ? "warn" : "");
+}
+function elapsed(){ return tStart ? Math.min(LIMIT_SEC, Math.floor((Date.now()-tStart)/1000)) : 0; }
+
+/* ===================================================================
+   3. 배선 보드
+=================================================================== */
+const MCU_PINS = [
+  {id:"3V3", x:330, y:190, side:"L", kind:"pwr"},
+  {id:"GND", x:330, y:225, side:"L", kind:"gnd"},
+  {id:"D1",  x:330, y:262, side:"L"}, {id:"D2", x:330, y:299, side:"L"},
+  {id:"D3",  x:330, y:336, side:"L"}, {id:"D4", x:330, y:373, side:"L"},
+  {id:"VIN", x:520, y:190, side:"R", kind:"pwr"},
+  {id:"GND2",x:520, y:225, side:"R", kind:"gnd", label:"GND"},
+  {id:"D5",  x:520, y:262, side:"R"}, {id:"D6", x:520, y:299, side:"R"},
+  {id:"D7",  x:520, y:336, side:"R"}, {id:"D8", x:520, y:373, side:"R"}
+];
+const COMPS = [
+  {id:"dht",  name:"DHT22 온습도 센서", sub:"입력 · 공기의 온도와 습도", x:40, y:50, w:190, h:110,
+   pins:[{id:"VCC",dx:190,dy:30},{id:"DATA",dx:190,dy:58},{id:"GND",dx:190,dy:86}]},
+  {id:"lcd",  name:"I2C 디스플레이", sub:"출력 · 16×2 글자 표시", x:640, y:50, w:200, h:135,
+   pins:[{id:"VCC",dx:0,dy:30},{id:"GND",dx:0,dy:62},{id:"SDA",dx:0,dy:94},{id:"SCL",dx:0,dy:122}]},
+  {id:"pump", name:"물뿜개 펌프", sub:"출력 · 모터 드라이버 내장", x:40, y:440, w:190, h:110,
+   pins:[{id:"VCC",dx:190,dy:30},{id:"IN",dx:190,dy:58},{id:"GND",dx:190,dy:86}]},
+  {id:"led",  name:"생장등 LED", sub:"출력 · 빛", x:640, y:450, w:200, h:95,
+   pins:[{id:"+",dx:0,dy:32},{id:"-",dx:0,dy:66}]}
+];
+let wires = [];     // {a:"dht.VCC", b:"mcu.D5"}
+let sel = null;
+
+function pinPos(key){
+  if(key.startsWith("mcu.")){
+    const p = MCU_PINS.find(p=>p.id===key.slice(4)); return p?{x:p.x,y:p.y}:null;
+  }
+  const [c,pn] = key.split(".");
+  const comp = COMPS.find(k=>k.id===c); if(!comp) return null;
+  const pin = comp.pins.find(k=>k.id===pn); if(!pin) return null;
+  return {x:comp.x+pin.dx, y:comp.y+pin.dy};
+}
+function buildBoard(){
+  const s = document.getElementById("board");
+  let h = "";
+  // NodeMCU 본체
+  h += `<rect x="330" y="150" width="190" height="300" class="comp" fill="#16293d" stroke="#3f6b96"/>
+        <text x="425" y="176" text-anchor="middle" class="complbl">NodeMCU (ESP8266)</text>
+        <rect x="395" y="196" width="60" height="34" rx="4" fill="#0d1a26" stroke="#2c4a66"/>
+        <text x="425" y="218" text-anchor="middle" class="compsub">USB</text>
+        <text x="425" y="432" text-anchor="middle" class="compsub">3.3 V 동작 · SDA=D2 · SCL=D1</text>`;
+  // 부품
+  COMPS.forEach(c=>{
+    h += `<rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" class="comp"/>
+          <text x="${c.x+12}" y="${c.y+22}" class="complbl">${c.name}</text>
+          <text x="${c.x+12}" y="${c.y+38}" class="compsub">${c.sub}</text>`;
+    c.pins.forEach(p=>{
+      const X=c.x+p.dx, Y=c.y+p.dy, left = p.dx===0;
+      h += `<g class="pin" data-k="${c.id}.${p.id}">
+              <circle cx="${X}" cy="${Y}" r="9" class="pindot" data-k="${c.id}.${p.id}"/>
+              <text x="${left?X+15:X-15}" y="${Y+4}" text-anchor="${left?"start":"end"}" class="pinlbl">${p.id}</text>
+            </g>`;
+    });
+  });
+  // MCU 핀
+  MCU_PINS.forEach(p=>{
+    const left = p.side==="L";
+    h += `<g class="pin" data-k="mcu.${p.id}">
+            <circle cx="${p.x}" cy="${p.y}" r="9" class="pindot ${p.kind||""}" data-k="mcu.${p.id}"/>
+            <text x="${left?p.x+14:p.x-14}" y="${p.y+4}" text-anchor="${left?"start":"end"}" class="pinlbl">${p.label||p.id}</text>
+          </g>`;
+  });
+  h += `<g id="wiresg"></g>`;
+  s.innerHTML = h;
+  s.querySelectorAll(".pin").forEach(g=>{
+    g.addEventListener("click", ()=>clickPin(g.dataset.k));
+  });
+}
+function clickPin(k){
+  if(sel === null){ sel = k; }
+  else if(sel === k){ sel = null; }
+  else {
+    const aM = sel.startsWith("mcu."), bM = k.startsWith("mcu.");
+    if(aM === bM){ toast("부품 단자와 NodeMCU 핀을 하나씩 골라야 합니다."); sel = null; }
+    else {
+      const comp = aM ? k : sel, mcu = aM ? sel : k;
+      wires = wires.filter(w => !(w.a===comp));      // 한 단자는 한 선만
+      wires.push({a:comp, b:mcu});
+      sel = null; saveWork();
+    }
+  }
+  renderWires();
+}
+function clearWires(){ wires = []; sel=null; renderWires(); saveWork(); }
+function renderWires(){
+  const g = document.getElementById("wiresg"); if(!g) return;
+  let h = "";
+  wires.forEach((w,i)=>{
+    const a = pinPos(w.a), b = pinPos(w.b); if(!a||!b) return;
+    const mx = (a.x+b.x)/2;
+    h += `<path class="wire" data-i="${i}" d="M${a.x},${a.y} C${mx},${a.y} ${mx},${b.y} ${b.x},${b.y}"/>`;
+  });
+  g.innerHTML = h;
+  g.querySelectorAll(".wire").forEach(p=>p.addEventListener("click",e=>{
+    wires.splice(+p.dataset.i,1); renderWires(); saveWork();
+  }));
+  const used = new Set(); wires.forEach(w=>{used.add(w.a);used.add(w.b);});
+  document.querySelectorAll("#board circle.pindot").forEach(c=>{
+    const k = c.dataset.k;
+    c.classList.toggle("sel", k===sel);
+    c.classList.toggle("used", k!==sel && used.has(k));
+  });
+  // 목록
+  const list = document.getElementById("wirelist");
+  if(list){
+    list.innerHTML = wires.length ? wires.map((w,i)=>
+      `<div><span>${w.a} → ${w.b.slice(4)}</span><button onclick="wires.splice(${i},1);renderWires();saveWork()">✕</button></div>`
+    ).join("") : `<div style="color:var(--dim);border:0">아직 없음</div>`;
+  }
+  const wc = document.getElementById("wirecheck");
+  if(wc){
+    const c = wiringStatus();
+    wc.innerHTML = [
+      ["DHT22 전원·접지·신호", c.dhtOK],
+      ["디스플레이 전원·SDA(D2)·SCL(D1)", c.lcdOK],
+      ["펌프 전원·접지·신호", c.pumpOK],
+      ["LED (+)신호 · (−)접지", c.ledOK]
+    ].map(([t,o])=>`<div>${o?"✅":"⬜"} ${t}</div>`).join("");
+  }
+}
+function wireOf(key){ const w = wires.find(w=>w.a===key); return w ? w.b.slice(4) : null; }
+function isPwr(p){ return p==="3V3" || p==="VIN"; }
+function isGnd(p){ return p==="GND" || p==="GND2"; }
+function isDig(p){ return /^D[0-8]$/.test(p||""); }
+function wiringStatus(){
+  const d = {v:wireOf("dht.VCC"), g:wireOf("dht.GND"), s:wireOf("dht.DATA")};
+  const l = {v:wireOf("lcd.VCC"), g:wireOf("lcd.GND"), sda:wireOf("lcd.SDA"), scl:wireOf("lcd.SCL")};
+  const p = {v:wireOf("pump.VCC"), g:wireOf("pump.GND"), s:wireOf("pump.IN")};
+  const e = {p:wireOf("led.+"), m:wireOf("led.-")};
+  return {
+    dhtOK: isPwr(d.v) && isGnd(d.g) && isDig(d.s), dhtPin: d.s,
+    lcdOK: isPwr(l.v) && isGnd(l.g) && l.sda==="D2" && l.scl==="D1",
+    pumpOK: isPwr(p.v) && isGnd(p.g) && isDig(p.s), pumpPin: p.s,
+    ledOK:  isDig(e.p) && isGnd(e.m), ledPin: e.p
+  };
+}
+function toast(t){
+  const d = document.createElement("div");
+  d.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#243546;color:#fff;padding:10px 18px;border-radius:10px;z-index:200;font-size:14px;border:1px solid #3a5168";
+  d.textContent = t; document.body.appendChild(d); setTimeout(()=>d.remove(), 2200);
+}
+
+/* ===================================================================
+   4. 미니 Arduino 인터프리터
+=================================================================== */
+function tokenize(src){
+  const T = []; let i = 0, line = 1;
+  const defs = {};
+  // 전처리기 줄 처리
+  src = src.split("\n").map(l=>{
+    const m = l.match(/^\s*#\s*define\s+(\w+)\s+(.+?)\s*$/);
+    if(m){ defs[m[1]] = m[2]; return ""; }
+    if(/^\s*#/.test(l)) return "";
+    return l;
+  }).join("\n");
+  while(i < src.length){
+    const c = src[i];
+    if(c === "\n"){ line++; i++; continue; }
+    if(/\s/.test(c)){ i++; continue; }
+    if(c === "/" && src[i+1] === "/"){ while(i<src.length && src[i] !== "\n") i++; continue; }
+    if(c === "/" && src[i+1] === "*"){ i+=2; while(i<src.length && !(src[i]==="*"&&src[i+1]==="/")){ if(src[i]==="\n")line++; i++; } i+=2; continue; }
+    if(c === '"'){ let s=""; i++; while(i<src.length && src[i] !== '"'){ if(src[i]==="\\"){s+=src[i+1];i+=2;} else s+=src[i++]; } i++; T.push({t:"str",v:s,line}); continue; }
+    if(c === "'"){ let s=""; i++; while(i<src.length && src[i] !== "'"){ s+=src[i++]; } i++; T.push({t:"str",v:s,line}); continue; }
+    if(/[0-9]/.test(c) || (c==="." && /[0-9]/.test(src[i+1]||""))){
+      let s=""; while(i<src.length && /[0-9a-fA-FxX.]/.test(src[i])) s+=src[i++];
+      while(i<src.length && /[uUlLfF]/.test(src[i])) i++;      // UL, L, f 접미사
+      T.push({t:"num", v: s.toLowerCase().startsWith("0x") ? parseInt(s,16) : parseFloat(s), line}); continue;
+    }
+    if(/[A-Za-z_]/.test(c)){
+      let s=""; while(i<src.length && /[A-Za-z0-9_]/.test(src[i])) s+=src[i++];
+      // 점 연결 (Serial.println, dht.readHumidity)
+      while(src[i]==="." && /[A-Za-z_]/.test(src[i+1]||"")){
+        s += "."; i++; while(i<src.length && /[A-Za-z0-9_]/.test(src[i])) s+=src[i++];
+      }
+      if(defs[s] !== undefined){
+        tokenize(defs[s]).tokens.filter(t=>t.t!=="eof").forEach(t=>T.push({...t,line}));
+        continue;
+      }
+      T.push({t:"id", v:s, line}); continue;
+    }
+    const three = src.substr(i,2);
+    if(["==","!=","<=",">=","&&","||","++","--","+=","-=","*=","/="].includes(three)){ T.push({t:"op",v:three,line}); i+=2; continue; }
+    T.push({t:"op", v:c, line}); i++;
+  }
+  T.push({t:"eof", v:"", line});
+  return {tokens:T, defs};
+}
+
+const TYPES = ["int","float","double","long","bool","boolean","byte","char","unsigned","void","String","const","static","uint8_t","uint16_t","uint32_t"];
+
+function parse(src){
+  const {tokens} = tokenize(src);
+  let p = 0;
+  const peek = (k=0)=>tokens[p+k];
+  const at = (v)=>peek().v===v;
+  const atType = ()=>peek().t==="id" && TYPES.includes(peek().v);
+  function eat(v){
+    if(peek().v !== v) err(`'${v}' 가 필요합니다. 여기서는 '${peek().v||"끝"}' 이(가) 나왔습니다.`);
+    return tokens[p++];
+  }
+  function err(m){ const e = new Error(`${peek().line}번째 줄: ${m}`); e.parse = true; throw e; }
+
+  function skipTypes(){ let n=0; while(atType()){ p++; n++; } return n; }
+
+  function parseProgram(){
+    const globals = [], funcs = {};
+    while(peek().t !== "eof"){
+      const save = p;
+      skipTypes();
+      if(peek().t !== "id"){ p = save+1; continue; }
+      const name = tokens[p++].v;
+      if(at("(")){
+        // 함수 정의(매개변수 포함)인지 먼저 시도하고, 아니면 객체 생성으로 본다
+        const mark = p;
+        let params = null;
+        try{ params = parseParams(); }catch(e){ params = null; }
+        if(params && at("{")){ funcs[name] = {params, body:parseBlock()}; }
+        else{
+          p = mark;
+          const args = parseArgs();
+          if(at("{")){ funcs[name] = {params:[], body:parseBlock()}; }
+          else { if(at(";")) p++; globals.push({k:"obj", name, args}); }
+        }
+      } else if(at("=")){
+        p++; const e = parseExpr(); if(at(";")) p++;
+        globals.push({k:"var", name, init:e});
+      } else if(at(";")){ p++; globals.push({k:"var", name, init:null}); }
+      else if(at("[")){ while(!at(";") && peek().t!=="eof") p++; p++; }
+      else { p = save+1; }
+    }
+    return {globals, funcs};
+  }
+  function parseArgs(){ eat("("); const a=[]; if(!at(")")){ do{ a.push(parseExpr()); }while(at(",") && ++p); } eat(")"); return a; }
+  function parseParams(){
+    eat("(");
+    const names = [];
+    if(at("void")) p++;
+    while(!at(")")){
+      if(peek().t === "eof") err("')' 가 빠졌습니다.");
+      if(at("&") || at("*")){ p++; continue; }
+      if(skipTypes() === 0 && names.length === 0 && !at(")")) throw new Error("not-params");
+      if(peek().t !== "id") throw new Error("not-params");
+      names.push(tokens[p++].v);
+      while(at("[")){ p++; while(!at("]")){ if(peek().t==="eof") throw new Error("not-params"); p++; } p++; }
+      if(at(",")){ p++; continue; }
+      if(!at(")")) throw new Error("not-params");
+    }
+    eat(")");
+    return names;
+  }
+  function parseBlock(){ eat("{"); const b=[]; while(!at("}")){ if(peek().t==="eof") err("'}' 가 빠졌습니다."); b.push(parseStmt()); } eat("}"); return {k:"block", body:b}; }
+
+  function parseStmt(){
+    if(at("{")) return parseBlock();
+    if(at(";")){ p++; return {k:"empty"}; }
+    if(at("if")){
+      p++; eat("("); const c = parseExpr(); eat(")");
+      const th = parseStmt(); let el = null;
+      if(at("else")){ p++; el = parseStmt(); }
+      return {k:"if", c, th, el};
+    }
+    if(at("while")){ p++; eat("("); const c=parseExpr(); eat(")"); return {k:"while", c, body:parseStmt()}; }
+    if(at("for")){
+      p++; eat("(");
+      const init = at(";") ? null : parseSimple(); eat(";");
+      const cond = at(";") ? null : parseExpr(); eat(";");
+      const step = at(")") ? null : parseSimple(); eat(")");
+      return {k:"for", init, cond, step, body:parseStmt()};
+    }
+    if(at("return")){ p++; const v = at(";")?null:parseExpr(); if(at(";"))p++; return {k:"return", v}; }
+    if(at("break")){ p++; if(at(";"))p++; return {k:"break"}; }
+    if(at("continue")){ p++; if(at(";"))p++; return {k:"continue"}; }
+    const s = parseSimple(); if(at(";")) p++; return s;
+  }
+  function parseSimple(){
+    const save = p;
+    if(atType()){
+      skipTypes();
+      if(peek().t === "id"){
+        const name = tokens[p++].v;
+        if(at("=")){ p++; return {k:"decl", name, init:parseExpr()}; }
+        if(at("(")){ const args = parseArgs(); return {k:"objdecl", name, args}; }
+        return {k:"decl", name, init:null};
+      }
+      p = save;
+    }
+    return {k:"expr", e:parseExpr()};
+  }
+
+  function parseExpr(){ return parseAssign(); }
+  function parseAssign(){
+    const l = parseOr();
+    if(peek().t==="op" && ["=","+=","-=","*=","/="].includes(peek().v)){
+      const op = tokens[p++].v; const r = parseAssign();
+      return {k:"assign", op, target:l, value:r};
+    }
+    return l;
+  }
+  function bin(next, ops){
+    return function(){
+      let l = next();
+      while(peek().t==="op" && ops.includes(peek().v)){ const o = tokens[p++].v; l = {k:"bin", o, l, r:next()}; }
+      return l;
+    };
+  }
+  const parseMul  = bin(parseUnary, ["*","/","%"]);
+  const parseAdd  = bin(()=>parseMul(), ["+","-"]);
+  const parseCmp  = bin(()=>parseAdd(), ["<",">","<=",">="]);
+  const parseEq   = bin(()=>parseCmp(), ["==","!="]);
+  const parseAnd  = bin(()=>parseEq(),  ["&&"]);
+  const parseOr   = bin(()=>parseAnd(), ["||"]);
+  function parseUnary(){
+    if(peek().t==="op" && ["!","-","+"].includes(peek().v)){ const o=tokens[p++].v; return {k:"un", o, e:parseUnary()}; }
+    if(peek().t==="op" && ["++","--"].includes(peek().v)){ const o=tokens[p++].v; const e=parseUnary(); return {k:"pre", o, e}; }
+    if(at("(") && tokens[p+1] && tokens[p+1].t==="id" && TYPES.includes(tokens[p+1].v) && tokens[p+2] && tokens[p+2].v===")"){
+      p+=3; return parseUnary();   // 캐스팅 무시
+    }
+    return parsePost();
+  }
+  function parsePost(){
+    let e = parsePrim();
+    while(peek().t==="op" && ["++","--"].includes(peek().v)){ e = {k:"post", o:tokens[p++].v, e}; }
+    return e;
+  }
+  function parsePrim(){
+    const t = peek();
+    if(t.t==="num"){ p++; return {k:"num", v:t.v}; }
+    if(t.t==="str"){ p++; return {k:"str", v:t.v}; }
+    if(t.v==="("){ p++; const e = parseExpr(); eat(")"); return e; }
+    if(t.t==="id"){
+      p++;
+      if(at("(")) return {k:"call", name:t.v, args:parseArgs(), line:t.line};
+      return {k:"id", name:t.v, line:t.line};
+    }
+    err(`'${t.v||"끝"}' 은(는) 여기 올 수 없습니다.`);
+  }
+  return parseProgram();
+}
+
+/* ===================================================================
+   5. 시뮬레이션 상태
+=================================================================== */
+const SIM = {
+  running:false, speed:600, t:0,        // t = 시뮬 밀리초
+  hum:62, temp:22, pumpOn:false, ledOn:false,
+  pins:{}, lcdBuf:["",""], lcdCur:[0,0], lcdOn:false,
+  health:100, serial:[], obs:{}, err:null, raf:null, last:0, gen:null, waitUntil:0, iters:0
+};
+function resetSim(){
+  stopRun();
+  Object.assign(SIM, {t:0, hum:62, temp:22, pumpOn:false, ledOn:false, pins:{},
+    lcdBuf:["",""], lcdCur:[0,0], lcdOn:false, health:100, serial:[], err:null,
+    obs:{}, gen:null, waitUntil:0, iters:0});
+  drawSim(); renderSerial();
+}
+function setSpeed(s){
+  SIM.speed = s;
+  document.querySelectorAll(".speeds button").forEach(b=>b.classList.toggle("on", +b.dataset.s===s));
+}
+function sprint(txt, isErr){
+  SIM.serial.push({t:fmtClock(SIM.t), s:String(txt), e:!!isErr});
+  if(SIM.serial.length > 250) SIM.serial.shift();
+}
+function renderSerial(){
+  const el = document.getElementById("serial");
+  el.innerHTML = SIM.serial.map(l=>`<div class="${l.e?"e":""}">[${l.t}] ${esc(l.s)}</div>`).join("");
+  el.scrollTop = el.scrollHeight;
+}
+function esc(s){ return s.replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function fmtClock(ms){
+  const total = Math.floor(ms/1000), d = Math.floor(total/86400);
+  const h = Math.floor(total%86400/3600), m = Math.floor(total%3600/60);
+  return `${d}일 ${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+}
+
+/* ---- 핀 ↔ 부품 ---- */
+function normPin(v){
+  if(typeof v === "string"){
+    if(/^D[0-8]$/i.test(v)) return v.toUpperCase();
+    return v;
+  }
+  const map = {16:"D0",5:"D1",4:"D2",0:"D3",2:"D4",14:"D5",12:"D6",13:"D7",15:"D8"};
+  return map[v] || ("GPIO"+v);
+}
+function applyPins(){
+  const w = wiringStatus();
+  SIM.ledOn  = w.ledOK  && (SIM.pins[w.ledPin]  > 0);
+  SIM.pumpOn = w.pumpOK && (SIM.pins[w.pumpPin] > 0);
+}
+
+/* ---- 내장 함수 ---- */
+function builtin(name, args, env){
+  const w = wiringStatus();
+  switch(name){
+    case "pinMode": return 0;
+    case "digitalWrite": {
+      const pin = normPin(args[0]); SIM.pins[pin] = (args[1]===1 || args[1]===true || args[1]==="HIGH") ? 255 : 0;
+      applyPins(); return 0; }
+    case "analogWrite": { SIM.pins[normPin(args[0])] = Math.max(0,Math.min(255, +args[1]||0)); applyPins(); return 0; }
+    case "digitalRead": return SIM.pins[normPin(args[0])] > 0 ? 1 : 0;
+    case "analogRead": return Math.round(SIM.hum * 10.23);
+    case "millis": return Math.floor(SIM.t);
+    case "micros": return Math.floor(SIM.t*1000);
+    case "Serial.begin": return 0;
+    case "Serial.print": sprint(fmtVal(args[0])); return 0;
+    case "Serial.println": sprint(args.length?fmtVal(args[0]):""); return 0;
+    case "map": { const [x,a,b,c,d]=args.map(Number); return (x-a)*(d-c)/(b-a)+c; }
+    case "constrain": return Math.max(args[1], Math.min(args[2], args[0]));
+    case "abs": return Math.abs(args[0]);
+    case "random": return args.length>1 ? Math.floor(Math.random()*(args[1]-args[0]))+args[0] : Math.floor(Math.random()*args[0]);
+    case "isnan": return (typeof args[0]==="number" && isNaN(args[0])) ? 1 : 0;
+  }
+  // 객체 메서드
+  const [obj, meth] = name.split(".");
+  const type = env.objTypes[obj];
+  if(type === "DHT" || /^dht/i.test(obj)){
+    if(!w.dhtOK){ SIM.obs.dhtNotWired = true; return NaN; }
+    SIM.obs.sensorRead = true;
+    if(meth === "readHumidity"){ SIM.obs.readHum = true; return Math.round(SIM.hum*10)/10; }
+    if(meth === "readTemperature"){ SIM.obs.readTemp = true; return Math.round(SIM.temp*10)/10; }
+    return 0;  // begin 등
+  }
+  if(type === "LiquidCrystal_I2C" || /^lcd/i.test(obj)){
+    if(!w.lcdOK){ SIM.obs.lcdNotWired = true; return 0; }
+    if(meth==="init"||meth==="begin"||meth==="backlight"){ SIM.lcdOn = true; return 0; }
+    if(meth==="clear"){ SIM.lcdBuf=["",""]; SIM.lcdCur=[0,0]; SIM.lcdOn=true; return 0; }
+    if(meth==="home"){ SIM.lcdCur=[0,0]; return 0; }
+    if(meth==="setCursor"){ SIM.lcdCur=[Math.max(0,+args[0]||0), Math.max(0,Math.min(1,+args[1]||0))]; return 0; }
+    if(meth==="print"){
+      SIM.lcdOn = true;
+      const s = fmtVal(args[0]); const [col,row] = SIM.lcdCur;
+      let line = SIM.lcdBuf[row].padEnd(col, " ");
+      line = line.slice(0,col) + s + line.slice(col+s.length);
+      SIM.lcdBuf[row] = line.slice(0,16);
+      SIM.lcdCur = [Math.min(16, col+s.length), row];
+      SIM.obs.lcdPrinted = true;
+      if(/[0-9]/.test(s)) SIM.obs.lcdNumber = true;
+      return 0;
+    }
+    return 0;
+  }
+  if(name.endsWith(".begin") || name.endsWith(".init")) return 0;
+  throw new Error(`'${name}()' 는 이 시뮬레이터가 모르는 명령입니다.`);
+}
+function fmtVal(v){
+  if(typeof v === "number"){
+    if(isNaN(v)) return "nan";
+    return Number.isInteger(v) ? String(v) : String(Math.round(v*100)/100);
+  }
+  if(typeof v === "boolean") return v?"1":"0";
+  return String(v===undefined?"":v);
+}
+
+/* ---- 실행기 (제너레이터) ---- */
+const BRK = {brk:1}, CNT = {cnt:1};
+function makeEnv(ast){
+  const env = {vars:{}, objTypes:{}, ast};
+  Object.assign(env.vars, {HIGH:1, LOW:0, true:1, false:0, INPUT:0, OUTPUT:1, INPUT_PULLUP:2,
+    A0:"A0", LED_BUILTIN:"D4", DHT22:22, DHT11:11, DHT21:21});
+  for(let i=0;i<=8;i++) env.vars["D"+i] = "D"+i;
+  return env;
+}
+function* evalExpr(n, env){
+  switch(n.k){
+    case "num": return n.v;
+    case "str": return n.v;
+    case "id":
+      if(n.name in env.vars) return env.vars[n.name];
+      if(/^D[0-8]$/.test(n.name)) return n.name;
+      throw new Error(`'${n.name}' 은(는) 선언된 적 없는 이름입니다. (${n.line}번째 줄)`);
+    case "call": {
+      const args = [];
+      for(const a of n.args) args.push(yield* evalExpr(a, env));
+      if(n.name === "delay"){ yield {delay: Math.max(0, +args[0]||0)}; return 0; }
+      if(n.name === "delayMicroseconds"){ yield {delay:(+args[0]||0)/1000}; return 0; }
+      if(env.ast.funcs[n.name]){
+        const f = env.ast.funcs[n.name];
+        (f.params||[]).forEach((pn,i)=>{ env.vars[pn] = args[i]; });
+        const r = yield* runBlock(f.body, env);
+        return (r && r.ret !== undefined) ? r.ret : 0;
+      }
+      return builtin(n.name, args, env);
+    }
+    case "bin": {
+      const a = yield* evalExpr(n.l, env);
+      if(n.o === "&&") return (truthy(a) && truthy(yield* evalExpr(n.r, env))) ? 1 : 0;
+      if(n.o === "||") return (truthy(a) || truthy(yield* evalExpr(n.r, env))) ? 1 : 0;
+      const b = yield* evalExpr(n.r, env);
+      switch(n.o){
+        case "+": return (typeof a==="string"||typeof b==="string") ? fmtVal(a)+fmtVal(b) : a+b;
+        case "-": return a-b; case "*": return a*b;
+        case "/": return b===0 ? 0 : a/b;
+        case "%": return b===0 ? 0 : a%b;
+        case "<": return a<b?1:0; case ">": return a>b?1:0;
+        case "<=": return a<=b?1:0; case ">=": return a>=b?1:0;
+        case "==": return a==b?1:0; case "!=": return a!=b?1:0;
+      }
+      return 0;
+    }
+    case "un": {
+      const v = yield* evalExpr(n.e, env);
+      if(n.o === "!") return truthy(v)?0:1;
+      if(n.o === "-") return -v;
+      return v;
+    }
+    case "pre": case "post": {
+      const name = n.e.name;
+      const old = env.vars[name] || 0;
+      env.vars[name] = n.o === "++" ? old+1 : old-1;
+      return n.k === "pre" ? env.vars[name] : old;
+    }
+    case "assign": {
+      const v = yield* evalExpr(n.value, env);
+      const name = n.target.name;
+      if(name === undefined) throw new Error("대입할 변수 이름을 알 수 없습니다.");
+      const cur = env.vars[name] || 0;
+      env.vars[name] = n.op === "=" ? v
+        : n.op === "+=" ? ((typeof cur==="string")?cur+fmtVal(v):cur+v)
+        : n.op === "-=" ? cur-v : n.op === "*=" ? cur*v : (v===0?cur:cur/v);
+      return env.vars[name];
+    }
+  }
+  return 0;
+}
+function truthy(v){ return !(v===0 || v===false || v==="" || v===undefined || v===null || (typeof v==="number"&&isNaN(v))); }
+
+function* runStmt(s, env){
+  switch(s.k){
+    case "block": return yield* runBlock(s, env);
+    case "empty": return;
+    case "decl": env.vars[s.name] = s.init ? yield* evalExpr(s.init, env) : 0; return;
+    case "objdecl": {
+      env.vars[s.name] = s.name;
+      return;
+    }
+    case "expr": yield* evalExpr(s.e, env); return;
+    case "if":
+      if(truthy(yield* evalExpr(s.c, env))) return yield* runStmt(s.th, env);
+      else if(s.el) return yield* runStmt(s.el, env);
+      return;
+    case "while": {
+      let guard = 0;
+      while(truthy(yield* evalExpr(s.c, env))){
+        if(++guard > 200000) throw new Error("while 문이 끝나지 않습니다. 조건을 확인하세요.");
+        const r = yield* runStmt(s.body, env);
+        if(r === BRK) break; if(r && r.ret !== undefined) return r;
+        yield {step:1};
+      }
+      return;
+    }
+    case "for": {
+      if(s.init) yield* runStmt(s.init.k?s.init:{k:"expr",e:s.init}, env);
+      let guard = 0;
+      while(!s.cond || truthy(yield* evalExpr(s.cond, env))){
+        if(++guard > 200000) throw new Error("for 문이 끝나지 않습니다. 조건을 확인하세요.");
+        const r = yield* runStmt(s.body, env);
+        if(r === BRK) break; if(r && r.ret !== undefined) return r;
+        if(s.step) yield* runStmt(s.step.k?s.step:{k:"expr",e:s.step}, env);
+        yield {step:1};
+      }
+      return;
+    }
+    case "return": return {ret: s.v ? yield* evalExpr(s.v, env) : 0};
+    case "break": return BRK;
+    case "continue": return CNT;
+  }
+}
+function* runBlock(b, env){
+  for(const s of b.body){
+    const r = yield* runStmt(s, env);
+    if(r === BRK || r === CNT || (r && r.ret !== undefined)) return r;
+  }
+}
+function* program(ast, env){
+  for(const g of ast.globals){
+    if(g.k === "var") env.vars[g.name] = g.init ? yield* evalExpr(g.init, env) : 0;
+    else { env.vars[g.name] = g.name; }
+  }
+  if(ast.funcs.setup) yield* runBlock(ast.funcs.setup.body, env);
+  if(!ast.funcs.loop) throw new Error("void loop() 가 없습니다.");
+  let n = 0;
+  while(true){
+    yield* runBlock(ast.funcs.loop.body, env);
+    SIM.iters++;
+    if(++n > 2000000) throw new Error("loop 가 너무 많이 돌았습니다.");
+    yield {step:1};
+  }
+}
+
+/* ---- 실행 제어 ---- */
+function toggleRun(){ SIM.running ? stopRun() : startRun(); }
+function startRun(){
+  const src = editor.value;
+  SIM.err = null;
+  let ast;
+  try{ ast = parse(src); }
+  catch(e){ sprint("컴파일 오류 — " + e.message, true); renderSerial(); SIM.obs.compileError = true; return; }
+  if(!ast.funcs.loop){ sprint("컴파일 오류 — void loop() 가 없습니다.", true); renderSerial(); SIM.obs.compileError = true; return; }
+  SIM.obs.compileError = false;
+  SIM.obs.compiled = true;
+  SIM.obs.hasSetup = !!ast.funcs.setup;
+  const env = makeEnv(ast);
+  // 객체 타입 수집
+  ast.globals.filter(g=>g.k==="obj").forEach(g=>{ env.objTypes[g.name] = guessType(src, g.name); });
+  SIM.gen = program(ast, env);
+  SIM.waitUntil = 0;
+  SIM.running = true; SIM.last = performance.now();
+  btnRun.textContent = "⏸ 멈춤"; btnRun.classList.remove("go"); btnRun.classList.add("stop");
+  sprint("── 실행 시작 ──");
+  loop();
+}
+function guessType(src, name){
+  const m = src.match(new RegExp("(\\w+)\\s+" + name + "\\s*\\("));
+  return m ? m[1] : "";
+}
+function stopRun(){
+  SIM.running = false;
+  if(SIM.raf) cancelAnimationFrame(SIM.raf);
+  btnRun.textContent = "▶ 실행"; btnRun.classList.add("go"); btnRun.classList.remove("stop");
+}
+function loop(){
+  if(!SIM.running) return;
+  const now = performance.now();
+  let dt = Math.min(100, now - SIM.last); SIM.last = now;
+  const simMs = dt * SIM.speed;            // 진행할 시뮬 시간
+  advance(simMs);
+  // 코드 실행
+  let budget = 4000;
+  try{
+    while(budget-- > 0){
+      if(SIM.waitUntil > SIM.t) break;
+      const r = SIM.gen.next();
+      if(r.done){ sprint("── 프로그램 종료 ──"); stopRun(); break; }
+      const y = r.value || {};
+      if(y.delay !== undefined){ SIM.waitUntil = SIM.t + y.delay; break; }
+    }
+  }catch(e){
+    sprint("실행 오류 — " + e.message, true); SIM.obs.runError = true; stopRun();
+  }
+  drawSim(); renderSerial();
+  SIM.raf = requestAnimationFrame(loop);
+}
+function advance(ms){
+  if(ms <= 0) return;
+  const hours = ms / 3600000;
+  SIM.t += ms;
+  // 습도 물리
+  if(SIM.pumpOn) SIM.hum += 60 * hours;
+  SIM.hum -= (SIM.ledOn ? 9 : 5) * hours;
+  SIM.hum = Math.max(5, Math.min(100, SIM.hum));
+  // 온도
+  const target = SIM.ledOn ? 26 : 21;
+  SIM.temp += (target - SIM.temp) * Math.min(1, hours*2);
+  // 관측 기록
+  observe(hours);
+  // 식물 건강
+  let d = 0;
+  if(SIM.hum < 30 || SIM.hum > 95) d -= 3*hours;
+  else d += 0.6*hours;
+  const lit = SIM.obs.lightHours || 0;
+  SIM.health = Math.max(0, Math.min(100, SIM.health + d));
+}
+function observe(hours){
+  const o = SIM.obs;
+  // 펌프 히스테리시스 관측
+  if(SIM.pumpOn && !o._wasPump){ o.pumpStartHum = SIM.hum; o._wasPump = true;
+    if(SIM.hum <= 43) o.pumpOnAtLow = true; }
+  if(!SIM.pumpOn && o._wasPump){ o._wasPump = false;
+    if(SIM.hum >= 67) o.pumpOffAtHigh = true; }
+  if(o.pumpOnAtLow && o.pumpOffAtHigh) o.humidityControl = true;
+  // 광주기 관측
+  if(SIM.ledOn){ o.ledEverOn = true; o.onRun = (o.onRun||0) + hours; }
+  else {
+    if(o.onRun > 0){
+      if(o.onRun >= 7 && o.onRun <= 9.5) o.lightOn8 = true;
+      o.lastOnRun = o.onRun; o.onRun = 0; o.ledEverOff = true;
+    }
+    if(o.ledEverOff) o.offRun = (o.offRun||0) + hours;
+  }
+  if(o.lightOn8 && (o.offRun||0) >= 2) o.photoperiod = true;
+  if((o.onRun||0) > 12) o.lightTooLong = true;
+}
+
+/* ===================================================================
+   6. 시뮬 화면
+=================================================================== */
+function buildStage(){ drawSim(); }
+function drawSim(){
+  const s = document.getElementById("stage"); if(!s) return;
+  const w = wiringStatus();
+  const lit = SIM.ledOn;
+  const sky = lit ? "#20313f" : "#101920";
+  const glow = lit ? 0.9 : 0;
+  const soilCol = SIM.hum > 55 ? "#4a3222" : SIM.hum > 35 ? "#6b4a30" : "#8a6a45";
+  const grow = Math.max(0.5, Math.min(1.35, SIM.health/75));
+  const leafCol = SIM.health > 60 ? "#49c178" : SIM.health > 30 ? "#b4c04a" : "#9a7a3c";
+  let h = `
+  <defs>
+    <radialGradient id="lamp"><stop offset="0%" stop-color="#fff3c4" stop-opacity="${glow}"/>
+      <stop offset="100%" stop-color="#fff3c4" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect x="0" y="0" width="620" height="440" fill="${sky}"/>
+  <rect x="60" y="40" width="500" height="360" rx="14" fill="none" stroke="#2c3d4f" stroke-width="2"/>
+  <text x="80" y="30" fill="#6f8ba3" font-size="12">스마트 온실</text>
+
+  <!-- LED 바 -->
+  <rect x="150" y="62" width="320" height="16" rx="6" fill="${lit?"#ffe68a":"#2a3744"}" stroke="#3f5468"/>
+  <text x="310" y="56" text-anchor="middle" fill="#8aa3ba" font-size="11">생장등 ${lit?"ON":"OFF"}</text>
+  <ellipse cx="310" cy="200" rx="230" ry="150" fill="url(#lamp)"/>
+
+  <!-- 화분 -->
+  <path d="M235,330 L385,330 L368,398 L252,398 Z" fill="#7a4a35" stroke="#5c3627" stroke-width="2"/>
+  <rect x="243" y="318" width="134" height="16" rx="4" fill="${soilCol}"/>
+  <!-- 식물 -->
+  <g transform="translate(310,320) scale(${grow.toFixed(2)})">
+    <path d="M0,0 L0,-70" stroke="#3f8a4e" stroke-width="5" fill="none"/>
+    <ellipse cx="-26" cy="-46" rx="27" ry="13" fill="${leafCol}" transform="rotate(-22 -26 -46)"/>
+    <ellipse cx="26" cy="-56" rx="27" ry="13" fill="${leafCol}" transform="rotate(20 26 -56)"/>
+    <ellipse cx="-22" cy="-70" rx="21" ry="11" fill="${leafCol}" transform="rotate(-30 -22 -70)"/>
+    <ellipse cx="22" cy="-80" rx="21" ry="11" fill="${leafCol}" transform="rotate(28 22 -80)"/>
+  </g>`;
+  // 물뿜개
+  h += `<rect x="430" y="150" width="46" height="26" rx="5" fill="${SIM.pumpOn?"#3f7fc4":"#2a3744"}" stroke="#4d6a86"/>
+        <text x="453" y="143" text-anchor="middle" fill="#8aa3ba" font-size="11">펌프</text>`;
+  if(SIM.pumpOn){
+    for(let i=0;i<14;i++){
+      const px = 430 - i*11 - Math.random()*6, py = 176 + i*9 + Math.random()*10;
+      h += `<circle cx="${px.toFixed(0)}" cy="${py.toFixed(0)}" r="${(1.6+Math.random()*1.6).toFixed(1)}" fill="#7fc9ff" opacity="0.8"/>`;
+    }
+  }
+  // 센서
+  h += `<rect x="140" y="150" width="40" height="52" rx="5" fill="${w.dhtOK?"#2c4a3a":"#2a3744"}" stroke="#4d6a86"/>
+        <text x="160" y="143" text-anchor="middle" fill="#8aa3ba" font-size="11">DHT22</text>
+        <text x="160" y="222" text-anchor="middle" fill="${w.dhtOK?"#4cc9a0":"#ff6b6b"}" font-size="11">${w.dhtOK?"연결됨":"미연결"}</text>`;
+  // 습도 막대
+  const bh = 230 * (SIM.hum/100);
+  h += `<rect x="545" y="110" width="26" height="230" rx="6" fill="#16222c" stroke="#36506a"/>
+        <rect x="545" y="${(340-bh).toFixed(0)}" width="26" height="${bh.toFixed(0)}" rx="6" fill="#49a9e0" opacity="0.85"/>
+        <line x1="539" y1="${340-230*0.4}" x2="577" y2="${340-230*0.4}" stroke="#ff6b6b" stroke-width="1.5" stroke-dasharray="3,3"/>
+        <line x1="539" y1="${340-230*0.7}" x2="577" y2="${340-230*0.7}" stroke="#4cc9a0" stroke-width="1.5" stroke-dasharray="3,3"/>
+        <text x="558" y="102" text-anchor="middle" fill="#8aa3ba" font-size="11">습도</text>
+        <text x="583" y="${340-230*0.4+4}" fill="#ff6b6b" font-size="10">40</text>
+        <text x="583" y="${340-230*0.7+4}" fill="#4cc9a0" font-size="10">70</text>`;
+  s.innerHTML = h;
+
+  sClock.textContent = fmtClock(SIM.t);
+  sHum.textContent = SIM.hum.toFixed(1) + " %";
+  sTemp.textContent = SIM.temp.toFixed(1) + " °C";
+  sLed.textContent = lit ? "🟡 ON" : "⚫ OFF";
+  sPump.textContent = SIM.pumpOn ? "💧 작동" : "⚫ 정지";
+  sPlant.textContent = SIM.health > 70 ? "🌿 건강" : SIM.health > 40 ? "🙂 보통" : "🥀 시듦";
+  const el = document.getElementById("lcd");
+  el.classList.toggle("off", !SIM.lcdOn);
+  el.textContent = SIM.lcdOn ? (SIM.lcdBuf[0].padEnd(16," ") + "\n" + SIM.lcdBuf[1].padEnd(16," ")) : " \n ";
+}
+
+/* ===================================================================
+   7. 코드 뼈대 / 저장
+=================================================================== */
+function loadSkeleton(){
+  if(editor.value.trim() && !confirm("지금 쓴 코드를 지우고 뼈대를 불러올까요?")) return;
+  const w = wiringStatus();
+  editor.value =
+`#include <DHT.h>
+#include <LiquidCrystal_I2C.h>
+
+// ── 핀 설정 (내가 연결한 핀으로 고칠 것) ──
+#define DHTPIN   ${w.dhtPin  || "D5"}
+#define PUMPPIN  ${w.pumpPin || "D6"}
+#define LEDPIN   ${w.ledPin  || "D7"}
+
+DHT dht(DHTPIN, DHT22);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+bool pumpOn = false;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(PUMPPIN, OUTPUT);
+  pinMode(LEDPIN, OUTPUT);
+  dht.begin();
+  lcd.init();
+  lcd.backlight();
+}
+
+void loop() {
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+
+  // ── TODO 1. 습도를 디스플레이에 표시하기 ──
+
+
+  // ── TODO 2. 습도 40% 이하 → 급수 시작, 70% 이상 → 정지 ──
+
+
+  // ── TODO 3. 하루 중 8시간만 LED 켜기 (millis 사용) ──
+
+
+  delay(1000);
+}
+`;
+  saveWork();
+  toast("뼈대를 불러왔습니다. TODO 세 곳을 채우세요.");
+}
+function insertTab(){
+  const s = editor.selectionStart;
+  editor.value = editor.value.slice(0,s) + "  " + editor.value.slice(editor.selectionEnd);
+  editor.selectionStart = editor.selectionEnd = s+2; editor.focus();
+}
+editor.addEventListener("keydown", e=>{
+  if(e.key === "Tab"){ e.preventDefault(); insertTab(); }
+});
+editor.addEventListener("input", ()=>{
+  codeInfo.textContent = editor.value.split("\n").length + "줄";
+  saveWorkDebounced();
+});
+let swt = null;
+function saveWorkDebounced(){ clearTimeout(swt); swt = setTimeout(saveWork, 600); }
+function saveWork(){
+  try{
+    localStorage.setItem("sf_work", JSON.stringify({wires, code:editor.value, expl:expl.value}));
+  }catch(e){}
+}
+function restoreWork(){
+  try{
+    const s = localStorage.getItem("sf_work");
+    if(s){ const d = JSON.parse(s); wires = d.wires||[]; editor.value = d.code||""; expl.value = d.expl||""; }
+    const t = localStorage.getItem("sf_tstart");
+    if(t){ tStart = +t; btnStart.textContent="⏱ 진행 중"; tick(); tInt = setInterval(tick,500); }
+  }catch(e){}
+  codeInfo.textContent = editor.value.split("\n").length + "줄";
+}
+expl.addEventListener("input", saveWorkDebounced);
+
+/* ===================================================================
+   8. 채점
+=================================================================== */
+function grade(){
+  const w = wiringStatus();
+  const src = editor.value;
+  const o = SIM.obs;
+  const txt = expl.value.trim();
+  const kw = (a)=>a.some(k=>txt.includes(k));
+  const items = [
+    { id:"structure", crit:"평가항목 1",
+      label:"피지컬 컴퓨팅의 구조(입력→처리→출력)를 설명함",
+      note:"⑤ 점검표의 서술 칸에 입력·처리·출력을 모두 담아 30자 이상 적기",
+      ok: txt.length >= 30 && kw(["입력","센서"]) && kw(["처리","제어","마이크로컨트롤러","NodeMCU","MCU"]) && kw(["출력","액츄에이터","액추에이터","표시","펌프","LED"]) },
+    { id:"wiring", crit:"평가항목 1",
+      label:"입력·처리·출력 장치가 모두 보드에 연결됨",
+      note:"센서 1개 + 출력 장치 3개(디스플레이·펌프·LED) 모두 올바른 배선",
+      ok: w.dhtOK && w.lcdOK && w.pumpOK && w.ledOK },
+    { id:"code", crit:"평가항목 2",
+      label:"코드로 프로세싱을 구현함 (setup/loop, 오류 없이 실행)",
+      note:"③ 코드 탭에 setup()과 loop()를 쓰고, ④에서 오류 없이 실행",
+      ok: !!o.compiled && !o.compileError && !o.runError && !!o.hasSetup && /void\s+loop/.test(src) },
+    { id:"logic", crit:"평가항목 2",
+      label:"조건 분기와 상태 기억을 사용함 (if + 변수)",
+      note:"if 문과, 펌프 켜짐을 기억하는 변수를 함께 사용",
+      ok: /\bif\s*\(/.test(src) && /\b(bool|boolean|int)\s+\w+/.test(src) && (o.iterations||SIM.iters) > 3 },
+    { id:"sensor", crit:"평가항목 3",
+      label:"센서를 연결해 온도 또는 습도를 실제로 측정함",
+      note:"DHT 배선 + readHumidity() 또는 readTemperature() 호출이 실행됨",
+      ok: w.dhtOK && (!!o.readHum || !!o.readTemp) },
+    { id:"display", crit:"평가항목 4",
+      label:"액츄에이터(디스플레이)로 결과를 출력함",
+      note:"LCD 배선 + lcd.print()로 숫자 값이 화면에 표시됨",
+      ok: w.lcdOK && !!o.lcdPrinted && !!o.lcdNumber },
+    { id:"humidity", crit:"평가항목 5",
+      label:"습도 조건에 따라 급수 장치가 반응함 (40% ↓ 작동, 70% ↑ 정지)",
+      note:"④에서 실제로 펌프가 40% 부근에서 켜지고 70% 부근에서 꺼지는 것이 관측되어야 함",
+      ok: !!o.humidityControl },
+    { id:"photo", crit:"평가항목 5",
+      label:"광주기 8시간 점등 / 16시간 소등을 구현함",
+      note:"④에서 LED가 약 8시간 켜졌다가 꺼지는 것이 관측되어야 함",
+      ok: !!o.photoperiod }
+  ];
+  const miss = items.filter(i=>!i.ok).length;
+  const score = Math.max(0, 40 - miss*5);
+  return {items, score};
+}
+function renderChecks(){
+  const {items, score} = grade();
+  scoreBig.textContent = score + " / 40";
+  scoreBig.style.color = score >= 35 ? "var(--acc)" : score >= 25 ? "var(--warn)" : "var(--bad)";
+  checks.innerHTML = items.map(i=>`
+    <div class="chk ${i.ok?"ok":"no"}">
+      <div class="ic">${i.ok?"✔":"✘"}</div>
+      <div><b>${i.label}</b> <span style="color:var(--dim);font-size:12px">· ${i.crit}</span>
+      <small>${i.note}</small></div>
+    </div>`).join("");
+}
+
+/* ===================================================================
+   9. 제출
+=================================================================== */
+async function finish(auto){
+  if(finished) return;
+  if(!auto && !confirm("제출하면 점수가 저장됩니다. 제출할까요?")) return;
+  finished = true;
+  stopRun(); clearInterval(tInt);
+  const {items, score} = grade();
+  const rubric = {}; items.forEach(i=>rubric[i.id] = {ok:i.ok, label:i.label, crit:i.crit});
+  const simlog = {hum:Math.round(SIM.hum*10)/10, temp:Math.round(SIM.temp*10)/10,
+    simHours:Math.round(SIM.t/3600000*10)/10, obs:SIM.obs, explanation: expl.value.trim(), loops:SIM.iters};
+  const ov = document.createElement("div");
+  ov.className = "overlay";
+  ov.innerHTML = `<div class="card">
+    <h1>${auto?"⏰ 시간 종료":"✅ 제출 완료"}</h1>
+    <div style="font-size:46px;font-weight:800;text-align:center;margin:10px 0;color:${score>=35?"var(--acc)":score>=25?"var(--warn)":"var(--bad)"}">${score} / 40</div>
+    <div id="ovList" style="font-size:14px"></div>
+    <div class="msg" id="ovMsg">저장 중…</div>
+    <button class="btn alt" onclick="this.closest('.overlay').remove()">닫고 결과 보기</button>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector("#ovList").innerHTML = items.map(i=>
+    `<div class="chk ${i.ok?"ok":"no"}"><div class="ic">${i.ok?"✔":"✘"}</div><div>${i.label}</div></div>`).join("");
+  const res = await rpc("sf_submit", {
+    p_student_id: ME.id, p_score: score, p_rubric: rubric, p_wiring: wires,
+    p_code: editor.value, p_sim_log: simlog, p_elapsed: elapsed(), p_auto: !!auto
+  });
+  const m = ov.querySelector("#ovMsg");
+  if(res && res.ok){ m.textContent = "서버에 저장되었습니다."; m.className = "msg ok"; }
+  else { m.textContent = "저장 실패: " + ((res&&res.error)||"알 수 없음") + " — 화면을 캡처해 선생님께 보여주세요."; m.className = "msg err"; }
+  go(4); renderChecks();
+  finished = false;   // 남은 시간에 다시 시도 가능 (최고점이 기록됨)
+}
+
+/* ===================================================================
+   10. 시작
+=================================================================== */
+setAuthMode("login");
+try{
+  const saved = localStorage.getItem("sf_me");
+  if(saved){ ME = JSON.parse(saved); enterApp(); }
+}catch(e){}
+</script>
+</body>
+</html>
